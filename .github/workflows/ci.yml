@@ -3,6 +3,7 @@ name: CI
 on:
   push:
   pull_request:
+  workflow_dispatch:
 
 jobs:
   desktop:
@@ -13,15 +14,15 @@ jobs:
       matrix:
         include:
           - name: Linux GCC + sanitizers
-            os: ubuntu-latest
+            os: ubuntu-24.04
             cc: gcc
             flags: -DCBAT_SANITIZE=ON
           - name: Linux Clang + sanitizers
-            os: ubuntu-latest
+            os: ubuntu-24.04
             cc: clang
             flags: -DCBAT_SANITIZE=ON
           - name: Linux shared library
-            os: ubuntu-latest
+            os: ubuntu-24.04
             cc: gcc
             flags: -DBUILD_SHARED_LIBS=ON
           - name: macOS Apple Clang + sanitizers
@@ -69,7 +70,7 @@ jobs:
 
   android:
     name: Android NDK (${{ matrix.abi }})
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
         abi: [arm64-v8a, x86_64]
@@ -86,7 +87,7 @@ jobs:
 
   single-header:
     name: Single header
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
       - name: Generate dist/cbat.h
@@ -95,7 +96,7 @@ jobs:
         run: |
           gcc -std=c99 -Wall -Wextra -Wpedantic -Werror -Idist tests/amalgamation_main.c -lm -o amalgamation
           ./amalgamation
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v6
         with:
           name: cbat-single-header
           path: dist/cbat.h
