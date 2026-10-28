@@ -23,6 +23,9 @@ Versions use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Optional raw DEFLATE/gzip codecs and memory ZIP32/ZIP64 readers, output
+  limits and checksum validation, independent Python interoperability fixtures,
+  compression fuzzing and a binary round-trip recipe.
 - Optional signed bigint arithmetic with exact decimal I/O, division/remainder,
   exponentiation, retained allocators, OOM tests and a factorial(100) recipe.
 - Optional ML helpers: centered/scaled pivoted-QR regression, k-means, kNN,

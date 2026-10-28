@@ -21,7 +21,7 @@ jobs:
           mkdir -p findings
           cp -R fuzz/corpus build/corpus
           failed=0
-          for target in json csv datetime base64 utf8 regex; do
+          for target in json csv datetime base64 utf8 regex compress; do
             mkdir -p findings/$target
             build/fuzz/fuzz_$target build/corpus/$target -max_total_time=60 -max_len=4096 -artifact_prefix=findings/$target/ > findings/$target.log 2>&1 || failed=1
             tail -n 8 findings/$target.log
@@ -46,10 +46,10 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
-      - run: cmake -S . -B build -DCMAKE_C_COMPILER=clang -DCBAT_WITH_REGEX=OFF -DCBAT_WITH_UI=OFF -DCBAT_WITH_NDARRAY=OFF -DCBAT_WITH_LINALG=OFF -DCBAT_WITH_ML=OFF -DCBAT_WITH_BIGINT=OFF -DCBAT_WERROR=ON
+      - run: cmake -S . -B build -DCMAKE_C_COMPILER=clang -DCBAT_WITH_REGEX=OFF -DCBAT_WITH_UI=OFF -DCBAT_WITH_NDARRAY=OFF -DCBAT_WITH_LINALG=OFF -DCBAT_WITH_ML=OFF -DCBAT_WITH_BIGINT=OFF -DCBAT_WITH_COMPRESS=OFF -DCBAT_WERROR=ON
       - run: cmake --build build --parallel
       - run: ctest --test-dir build --output-on-failure
-      - run: clang -std=c99 -Wall -Wextra -Werror -DCBAT_WITH_REGEX=0 -DCBAT_WITH_UI=0 -DCBAT_WITH_NDARRAY=0 -DCBAT_WITH_BIGINT=0 -I build/dist tests/amalgamation_main.c -lm -o build/single-minimal && build/single-minimal
+      - run: clang -std=c99 -Wall -Wextra -Werror -DCBAT_WITH_REGEX=0 -DCBAT_WITH_UI=0 -DCBAT_WITH_NDARRAY=0 -DCBAT_WITH_BIGINT=0 -DCBAT_WITH_COMPRESS=0 -I build/dist tests/amalgamation_main.c -lm -o build/single-minimal && build/single-minimal
 
   sdl-host:
     name: SDL UI reference host

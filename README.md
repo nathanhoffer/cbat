@@ -124,6 +124,11 @@ the single-header edition also omits ML when ndarray is disabled.
 arithmetic, truncating division/remainder and powers. Its independent option
 is `CBAT_WITH_BIGINT`; set it to OFF (CMake) or 0 (single header) to omit it.
 
+`cbat/compress.h` supports raw DEFLATE and gzip encoding/decoding, plus
+single-disk ZIP32/ZIP64 listing and stored/deflated entry reading. Decoders
+default to 64 MiB output per call; `CBatCompressOptions` changes that limit.
+`CBAT_WITH_COMPRESS` controls this independent module. No zlib dependency.
+
 Build and install to a prefix you own (no administrator access required):
 
 ```bash

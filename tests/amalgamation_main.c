@@ -70,5 +70,15 @@ int main(void) {
         cbat_array_free(array);
     }
 #endif
+#if !defined(CBAT_WITH_COMPRESS) || CBAT_WITH_COMPRESS
+    {
+        CBatBytes *encoded = NULL, *decoded = NULL;
+        if (cbat_gzip_compress("abcabc", 6, &encoded) != CBAT_OK) return 1;
+        if (cbat_gzip_decompress(encoded->data, encoded->length, &decoded) != CBAT_OK || decoded->length != 6) {
+            cbat_bytes_free(encoded); cbat_bytes_free(decoded); return 1;
+        }
+        cbat_bytes_free(encoded); cbat_bytes_free(decoded);
+    }
+#endif
     return 0;
 }
