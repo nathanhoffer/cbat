@@ -43,6 +43,10 @@ Read [docs/DESIGN.md](docs/DESIGN.md) and [PROMPT.md](PROMPT.md).
 `python tools/amalgamate.py` regenerates `dist/cbat.h`. Do not edit generated
 output. The amalgamation is built and tested by CMake and CI.
 
+After editing public headers, run `python tools/gen_api_docs.py` to update
+the API reference. CI runs `python tools/gen_api_docs.py --check` and parser
+tests (`python -m unittest discover -s tools/tests`).
+
 The companion app embeds public headers and generates VM bindings. Header
 changes, including comments, require coordination with its maintainer to
 regenerate headers/bindings and test its engine and bundled examples. New C

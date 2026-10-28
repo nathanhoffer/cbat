@@ -10,3 +10,5 @@ out/
 *.pdb
 *.ilk
 CMakeUserPresets.json
+__pycache__/
+*.pyc

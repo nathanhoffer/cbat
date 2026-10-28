@@ -6,6 +6,14 @@ on:
   workflow_dispatch:
 
 jobs:
+  api-docs:
+    name: API reference
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - run: python3 -m unittest discover -s tools/tests
+      - run: python3 tools/gen_api_docs.py --check
+
   desktop:
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}

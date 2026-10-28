@@ -33,6 +33,9 @@ iOS and Android.
 
 ## What's inside
 
+See the generated [API reference](docs/API.md) for public types, signatures,
+and header documentation.
+
 | Header | Python equivalent | Highlights |
 |---|---|---|
 | `cbat/base.h` | (none) | `CBatError` codes, pluggable allocators, `CBatArena` |
