@@ -13,6 +13,8 @@
  * The runner wraps the default allocator around every test and fails any
  * test that leaks cbat allocations. cbat_test_fail_allocations_after() lets a
  * test force allocations to fail so out-of-memory paths can be exercised.
+ * Tracking and injection use global state: run tests serially, with no
+ * concurrent cbat calls from other threads.
  *
  * Part of cbat (C Batteries Included). MIT License.
  */

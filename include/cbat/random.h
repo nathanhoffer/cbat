@@ -12,6 +12,11 @@
  * is seeded from the clock on first use (not thread-safe). NOT suitable for
  * cryptography.
  *
+ * Thread safety: use one generator per thread, seeded with seed/seed_stream
+ * before use. Initialize global state before starting threads and serialize
+ * every NULL-generator call. seed_from_time uses a shared counter even with
+ * an explicit generator: serialize it or call it only during startup.
+ *
  * Part of cbat (C Batteries Included). MIT License.
  */
 #ifndef CBAT_RANDOM_H

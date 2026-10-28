@@ -16,6 +16,9 @@
  *
  * Part of cbat (C Batteries Included). MIT License.
  */
+/* Thread safety: on Windows, call cbat_time_monotonic once at startup before
+ * worker threads use it, to initialize its cached frequency. Do not change
+ * process locale/timezone concurrently with locale/timezone-sensitive calls. */
 #ifndef CBAT_TIME_H
 #define CBAT_TIME_H
 

@@ -69,6 +69,38 @@ if (err != CBAT_OK) {
   files define `_POSIX_C_SOURCE 200809L` before any include.
 - Never rely on `long` being 64-bit; use `<stdint.h>` types.
 
+## Thread safety
+
+cbat objects do not provide internal locking. Give each thread its own
+mutable objects, or synchronize all access to a shared object whenever any
+thread may modify or free it. Borrowed pointers must not outlive their object
+or be used concurrently with operations that invalidate them. Read-only
+access to immutable objects is safe when their lifetime is synchronized.
+
+Configure the default allocator and logging before starting worker threads;
+do not change global configuration while workers use cbat. Allocator/context
+objects must outlive their users, and custom allocators shared by threads must
+provide their own synchronization. Arenas are mutable and require the same
+protection as containers.
+
+Random functions given NULL mutate a global generator, including during lazy
+seeding. Initialize it before threads start and serialize **every** use, or
+prefer a separate `CBatRandom` per thread seeded with `cbat_random_seed` or
+`cbat_random_seed_stream`. `cbat_random_seed_from_time` also uses a shared
+counter even with an explicit generator: call it during single-threaded
+setup or protect it with a process-wide lock.
+
+Logging configuration is global. A custom log handler, its user data, and
+its output stream must tolerate concurrent calls or be protected by the
+caller. Avoid configuration changes from handlers. The native test runner
+uses global allocation-tracking/failure-injection state: run it serially,
+without concurrent calls into cbat from other threads.
+
+On Windows, call `cbat_time_monotonic` once during single-threaded startup
+before sharing it across threads (it caches the performance-counter frequency
+on first use). Do not change process locale or timezone concurrently with
+locale/timezone-sensitive calls.
+
 ## Tests
 
 ```c

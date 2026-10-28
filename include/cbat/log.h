@@ -9,6 +9,9 @@
  * timestamp and source location. A custom handler can capture messages
  * (the app uses this to show them in its console). Configuration is global
  * and not thread-safe; set it up once at startup.
+ * Keep configuration fixed while worker threads run. Custom handlers, user
+ * data and shared output streams must support concurrent calls or be locked
+ * by the caller. Do not change configuration from a handler.
  *
  * Part of cbat (C Batteries Included). MIT License.
  */

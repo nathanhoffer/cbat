@@ -1,5 +1,7 @@
 /*
  * cbat/cbat.h - includes every tier-1 cbat module.
+ * Objects have no internal locks. Configure globals before starting threads
+ * and synchronize shared mutable state; see docs/DESIGN.md (Thread safety).
  * Part of cbat (C Batteries Included). MIT License.
  */
 #ifndef CBAT_CBAT_H

@@ -158,6 +158,11 @@ Source: [`cbat/base.h`](../include/cbat/base.h)
 cbat/base.h - errors, allocators, arenas and small helpers used by every
 other cbat module.
 
+Thread safety: objects have no internal locks. Synchronize mutation and
+lifetime of shared objects, arenas, and allocator contexts. Configure the
+default allocator before starting threads; keep it fixed while in use.
+Custom allocators used across threads must provide their own locking.
+
 Part of cbat (C Batteries Included). MIT License.
 ```
 
@@ -266,6 +271,7 @@ CBAT_API void cbat_set_default_allocator(const CBatAllocator *allocator);
 
 Replaces the default allocator (NULL restores the heap allocator).
 Not thread-safe: call once at startup, before creating cbat objects.
+The allocator and its context must outlive every object using them.
 
 ```c
 CBAT_API void *cbat_alloc(const CBatAllocator *allocator, size_t size);
@@ -386,6 +392,8 @@ Source: [`cbat/cbat.h`](../include/cbat/cbat.h)
 
 ```text
 cbat/cbat.h - includes every tier-1 cbat module.
+Objects have no internal locks. Configure globals before starting threads
+and synchronize shared mutable state; see docs/DESIGN.md (Thread safety).
 Part of cbat (C Batteries Included). MIT License.
 ```
 
@@ -1508,6 +1516,9 @@ Output goes to stderr by default as "LEVEL: message", optionally with a
 timestamp and source location. A custom handler can capture messages
 (the app uses this to show them in its console). Configuration is global
 and not thread-safe; set it up once at startup.
+Keep configuration fixed while worker threads run. Custom handlers, user
+data and shared output streams must support concurrent calls or be locked
+by the caller. Do not change configuration from a handler.
 
 Part of cbat (C Batteries Included). MIT License.
 ```
@@ -1746,6 +1757,11 @@ random module).
 Every function accepts NULL for the generator to use a global one that
 is seeded from the clock on first use (not thread-safe). NOT suitable for
 cryptography.
+
+Thread safety: use one generator per thread, seeded with seed/seed_stream
+before use. Initialize global state before starting threads and serialize
+every NULL-generator call. seed_from_time uses a shared counter even with
+an explicit generator: serialize it or call it only during startup.
 
 Part of cbat (C Batteries Included). MIT License.
 ```
@@ -2446,6 +2462,8 @@ cbat/test.h - a small unit-test framework (cbat's answer to unittest).
 The runner wraps the default allocator around every test and fails any
 test that leaks cbat allocations. cbat_test_fail_allocations_after() lets a
 test force allocations to fail so out-of-memory paths can be exercised.
+Tracking and injection use global state: run tests serially, with no
+concurrent cbat calls from other threads.
 
 Part of cbat (C Batteries Included). MIT License.
 ```

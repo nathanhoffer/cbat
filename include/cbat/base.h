@@ -2,6 +2,11 @@
  * cbat/base.h - errors, allocators, arenas and small helpers used by every
  * other cbat module.
  *
+ * Thread safety: objects have no internal locks. Synchronize mutation and
+ * lifetime of shared objects, arenas, and allocator contexts. Configure the
+ * default allocator before starting threads; keep it fixed while in use.
+ * Custom allocators used across threads must provide their own locking.
+ *
  * Part of cbat (C Batteries Included). MIT License.
  */
 #ifndef CBAT_BASE_H
@@ -152,6 +157,7 @@ CBAT_API const CBatAllocator *cbat_default_allocator(void);
 /**
  * Replaces the default allocator (NULL restores the heap allocator).
  * Not thread-safe: call once at startup, before creating cbat objects.
+ * The allocator and its context must outlive every object using them.
  */
 CBAT_API void cbat_set_default_allocator(const CBatAllocator *allocator);
 
