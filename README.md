@@ -44,6 +44,7 @@ and header documentation.
 | `cbat/test.h` | `unittest` | check macros, automatic leak detection, out-of-memory injection |
 | `cbat/string.h` | `str` | growable strings, find/replace/split/join/trim, number parsing, UTF-8 |
 | `cbat/list.h` | `list` | type-erased dynamic array, typed macros, element destructors |
+| `cbat/heap.h` | `heapq` | min-priority queue, O(n) heap construction, smallest/largest selection |
 | `cbat/dict.h` | `dict` | insertion-ordered string-keyed hash map |
 | `cbat/map.h` | `dict` | fixed-size keys (integers, structs), custom hash/equality, insertion order |
 | `cbat/set.h` | `set` | union, intersection, difference, subset |

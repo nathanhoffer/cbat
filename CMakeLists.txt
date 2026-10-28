@@ -25,6 +25,7 @@ set(CBAT_MODULES
     test
     sort
     list
+    heap
     hash
     string
     dict

@@ -10,6 +10,8 @@
 int main(void) {
     CBatArena *arena = cbat_arena_new(0);
     CBatMap *map;
+    CBatHeap *heap;
+    int minimum;
     char *copy;
     if (arena == NULL) {
         return 1;
@@ -29,5 +31,14 @@ int main(void) {
         return 1;
     }
     cbat_map_free(map);
+    heap = cbat_heap_new(sizeof(int), cbat_compare_int);
+    if (heap == NULL) return 1;
+    if (CBAT_HEAP_PUSH(heap, int, 9) != CBAT_OK ||
+        CBAT_HEAP_PUSH(heap, int, 2) != CBAT_OK ||
+        cbat_heap_pop(heap, &minimum) != CBAT_OK || minimum != 2) {
+        cbat_heap_free(heap);
+        return 1;
+    }
+    cbat_heap_free(heap);
     return 0;
 }

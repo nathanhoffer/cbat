@@ -11,6 +11,7 @@
 #include "cbat/test.h"
 #include "cbat/sort.h"
 #include "cbat/list.h"
+#include "cbat/heap.h"
 #include "cbat/hash.h"
 #include "cbat/string.h"
 #include "cbat/dict.h"

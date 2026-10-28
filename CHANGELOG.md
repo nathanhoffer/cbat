@@ -23,6 +23,8 @@ Versions use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `CBatHeap` min-priority queue, allocation-free push/pop combination,
+  linear-time construction, smallest/largest list selection, and a Dijkstra recipe.
 - Bounded splitting, line splitting, partition, ASCII predicates, natural
   ordering, padding, prefix/suffix removal, byte-set stripping, and validated
   UTF-8 reversal/code-point slicing. UTF-8 fuzzing checks reverse/slice invariants.

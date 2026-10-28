@@ -18,6 +18,7 @@ For conventions and ownership rules, see [DESIGN.md](DESIGN.md).
 - [file](#file)
 - [fs](#fs)
 - [hash](#hash)
+- [heap](#heap)
 - [json](#json)
 - [list](#list)
 - [log](#log)
@@ -1091,6 +1092,109 @@ CBAT_API void cbat_sha256_hex(const void *data, size_t length, char hex[CBAT_SHA
 ```
 
 One-shot lowercase hex digest, NUL-terminated.
+
+
+## heap
+
+Source: [`cbat/heap.h`](../include/cbat/heap.h)
+
+```text
+cbat/heap.h - min-priority queues, in the style of Python's heapq.
+Entries are copied bytes and ordered by a CBatCompare callback. Callbacks
+must not modify the heap. Borrowed peek pointers are read-only and valid
+until the next modification. No internal locking. Part of cbat. MIT License.
+```
+
+```c
+typedef struct CBatHeap CBatHeap;
+```
+
+```c
+CBAT_API CBatHeap *cbat_heap_new(size_t element_size, CBatCompare compare);
+```
+
+New min-heap; NULL for zero element_size, NULL compare, or OOM.
+
+```c
+CBAT_API CBatHeap *cbat_heap_new_with(size_t element_size, CBatCompare compare, const CBatAllocator *allocator);
+```
+
+Same with a custom allocator (NULL = default), which must outlive the heap.
+
+```c
+CBAT_API void cbat_heap_free(CBatHeap *heap);
+```
+
+Destroys remaining elements and storage. NULL is ignored.
+
+```c
+CBAT_API void cbat_heap_set_destructor(CBatHeap *heap, CBatDestructor destructor);
+```
+
+Ownership callback for elements popped without an output or freed.
+
+```c
+CBAT_API size_t cbat_heap_length(const CBatHeap *heap);
+```
+
+Number of entries (0 for NULL).
+
+```c
+CBAT_API bool cbat_heap_is_empty(const CBatHeap *heap);
+```
+
+Whether there are no entries (true for NULL).
+
+```c
+CBAT_API CBatError cbat_heap_push(CBatHeap *heap, const void *element);
+```
+
+Copies an element, taking ownership of pointed-to resources on success
+when a destructor is configured. O(log n); failure leaves the heap unchanged.
+Copying bytes does not clone resources; do not insert duplicate ownership.
+
+```c
+CBAT_API CBatError cbat_heap_pop(CBatHeap *heap, void *out);
+```
+
+Removes the minimum in O(log n). Non-NULL out receives ownership;
+otherwise the destructor runs. EMPTY leaves outputs unchanged. Output must
+be external storage (a pointer into heap storage gives INVALID_ARGUMENT).
+
+```c
+CBAT_API void *cbat_heap_peek(const CBatHeap *heap);
+```
+
+Borrowed read-only minimum, or NULL for empty/NULL heap.
+
+```c
+CBAT_API CBatError cbat_heap_push_pop(CBatHeap *heap, const void *element, void *out);
+```
+
+Pushes then pops, without growing storage. If the input <= minimum (or
+heap is empty), returns/destroys the input and leaves the heap unchanged.
+Otherwise returns/destroys the old minimum and keeps the input.
+Same ownership/output rules as push/pop; no allocation after construction.
+
+```c
+CBAT_API CBatError cbat_heap_from_list(const CBatList *list, CBatCompare compare, CBatHeap **out);
+```
+
+O(n) heap construction from copied list elements, using the list allocator.
+The new heap has no destructor: pointed-to resources remain borrowed.
+Output unchanged on error. The list is not modified.
+
+```c
+CBAT_API CBatError cbat_list_smallest(const CBatList *list, size_t count, CBatCompare compare, CBatList **out);
+```
+
+Up to count smallest items, ascending. New shallow list, no destructor; source unchanged.
+
+```c
+CBAT_API CBatError cbat_list_largest(const CBatList *list, size_t count, CBatCompare compare, CBatList **out);
+```
+
+Up to count largest items, descending. New shallow list, no destructor; source unchanged.
 
 
 ## json
