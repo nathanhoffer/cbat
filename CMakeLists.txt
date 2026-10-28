@@ -50,7 +50,7 @@ set(CBAT_MODULES
 )
 
 # ---- Warnings --------------------------------------------------------------
-set(CBAT_OPTIONAL_MODULES regex ui ndarray linalg ml)
+set(CBAT_OPTIONAL_MODULES regex ui ndarray linalg ml bigint)
 set(CBAT_ENABLED_MODULES ${CBAT_MODULES})
 foreach(module IN LISTS CBAT_OPTIONAL_MODULES)
     string(TOUPPER "${module}" module_upper)
@@ -189,6 +189,9 @@ if(CBAT_BUILD_COOKBOOK)
             continue()
         endif()
         if(recipe_name STREQUAL "28-small-machine-learning" AND NOT CBAT_WITH_ML)
+            continue()
+        endif()
+        if(recipe_name STREQUAL "29-factorial-bigint" AND NOT CBAT_WITH_BIGINT)
             continue()
         endif()
         set(recipe_target "cookbook_${recipe_name}")

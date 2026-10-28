@@ -120,6 +120,10 @@ For the single header, setting `CBAT_WITH_NDARRAY 0` also omits linalg.
 index splitting and population z-scores. `CBAT_WITH_ML` requires ndarray;
 the single-header edition also omits ML when ndarray is disabled.
 
+`cbat/bigint.h` provides signed arbitrary-precision integers, decimal parsing,
+arithmetic, truncating division/remainder and powers. Its independent option
+is `CBAT_WITH_BIGINT`; set it to OFF (CMake) or 0 (single header) to omit it.
+
 Build and install to a prefix you own (no administrator access required):
 
 ```bash

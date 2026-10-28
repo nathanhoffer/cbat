@@ -10,6 +10,7 @@ For conventions and ownership rules, see [DESIGN.md](DESIGN.md).
 
 - [args](#args)
 - [base](#base)
+- [bigint](#bigint)
 - [bytes](#bytes)
 - [cbat](#cbat)
 - [csv](#csv)
@@ -394,6 +395,113 @@ CBAT_API const CBatAllocator *cbat_arena_allocator(CBatArena *arena);
 ```
 
 An allocator view of the arena, valid for as long as the arena lives.
+
+
+## bigint
+
+Source: [`cbat/bigint.h`](../include/cbat/bigint.h)
+
+```text
+cbat/bigint.h - signed arbitrary-precision integers. MIT License.
+Optional CBAT_WITH_BIGINT (default ON); include explicitly.
+Values own their limbs and retain their allocator. No fixed bit limit;
+checked allocation sizes bound representable storage. Arithmetic creates
+new values using the first operand's allocator; inputs remain unchanged.
+All fallible APIs preserve output parameters on failure. Objects require
+external synchronization for concurrent mutation/free.
+```
+
+```c
+typedef struct CBatBigInt CBatBigInt;
+```
+
+```c
+CBAT_API CBatBigInt *cbat_bigint_new(void);
+```
+
+New zero; NULL on OOM.
+
+```c
+CBAT_API CBatBigInt *cbat_bigint_new_with(const CBatAllocator *allocator);
+```
+
+New zero with retained allocator (NULL = default); allocator must outlive value/results.
+
+```c
+CBAT_API void cbat_bigint_free(CBatBigInt *value);
+```
+
+Frees value/limbs; NULL ignored.
+
+```c
+CBAT_API CBatError cbat_bigint_from_string(const char *text, CBatBigInt **out);
+```
+
+Parses decimal digits with optional sign and surrounding ASCII whitespace.
+Empty input, internal whitespace, hex and underscores give PARSE.
+
+```c
+CBAT_API CBatError cbat_bigint_from_string_with(const char *text, const CBatAllocator *allocator, CBatBigInt **out);
+```
+
+Same with retained allocator.
+
+```c
+CBAT_API CBatError cbat_bigint_from_int64(int64_t value, CBatBigInt **out);
+```
+
+New exact signed 64-bit value.
+
+```c
+CBAT_API CBatError cbat_bigint_copy(const CBatBigInt *value, CBatBigInt **out);
+```
+
+Deep copy using value's allocator.
+
+```c
+CBAT_API CBatError cbat_bigint_to_string(const CBatBigInt *value, CBatString **out);
+```
+
+New owned canonical decimal string (no plus/leading zeros, zero is "0").
+
+```c
+CBAT_API int cbat_bigint_compare(const CBatBigInt *a, const CBatBigInt *b);
+```
+
+-1/0/+1 ordering; NULL is treated as zero.
+
+```c
+CBAT_API CBatError cbat_bigint_add(const CBatBigInt *a, const CBatBigInt *b, CBatBigInt **out);
+```
+
+New a+b.
+
+```c
+CBAT_API CBatError cbat_bigint_subtract(const CBatBigInt *a, const CBatBigInt *b, CBatBigInt **out);
+```
+
+New a-b.
+
+```c
+CBAT_API CBatError cbat_bigint_multiply(const CBatBigInt *a, const CBatBigInt *b, CBatBigInt **out);
+```
+
+New a*b (schoolbook multiplication).
+
+```c
+CBAT_API CBatError cbat_bigint_divmod(const CBatBigInt *a, const CBatBigInt *b, CBatBigInt **quotient, CBatBigInt **remainder);
+```
+
+Quotient truncates toward zero; remainder has dividend's sign and |r|<|b|.
+Either output may be NULL, but not both; non-NULL outputs must be distinct.
+Zero divisor gives INVALID_ARGUMENT. Both outputs publish atomically.
+Multi-limb long division uses a bounded binary search per quotient limb.
+
+```c
+CBAT_API CBatError cbat_bigint_pow(const CBatBigInt *value, uint64_t exponent, CBatBigInt **out);
+```
+
+New value^exponent via repeated squaring. 0^0 is 1.
 
 
 ## bytes

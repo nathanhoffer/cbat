@@ -23,6 +23,8 @@ Versions use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Optional signed bigint arithmetic with exact decimal I/O, division/remainder,
+  exponentiation, retained allocators, OOM tests and a factorial(100) recipe.
 - Optional ML helpers: centered/scaled pivoted-QR regression, k-means, kNN,
   train/test index splitting and atomic column normalization, with numeric,
   reproducibility/OOM coverage and a small-data cookbook recipe.
