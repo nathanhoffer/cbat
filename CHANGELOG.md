@@ -23,6 +23,8 @@ Versions use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Cookbook recipes for streaming CSV totals, a validated JSON struct round
+  trip, and an aligned counting allocator with live/peak byte tracking.
 - Calendar day/month arithmetic, ISO weeks, precise instant comparison, duration
   formatting, random sampling/weighted selection/UUID4, HMAC-SHA256 and legacy
   SHA-1/MD5 checksums, with published hash vectors and a cookbook recipe.
