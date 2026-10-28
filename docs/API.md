@@ -20,6 +20,7 @@ For conventions and ownership rules, see [DESIGN.md](DESIGN.md).
 - [fs](#fs)
 - [hash](#hash)
 - [heap](#heap)
+- [ini](#ini)
 - [json](#json)
 - [list](#list)
 - [log](#log)
@@ -1392,6 +1393,112 @@ CBAT_API CBatError cbat_list_largest(const CBatList *list, size_t count, CBatCom
 ```
 
 Up to count largest items, descending. New shallow list, no destructor; source unchanged.
+
+
+## ini
+
+Source: [`cbat/ini.h`](../include/cbat/ini.h)
+
+```text
+cbat/ini.h - insertion-ordered INI settings (case-sensitive sections/keys).
+Supports key=value / key:value, full-line comments, and inline comments
+beginning with ';' or '#' after whitespace (or after a closing quote).
+Single/double-quoted values
+preserve whitespace; only matching quotes and backslashes are unescaped.
+No interpolation, inheritance or multiline values. Part of cbat. MIT License.
+```
+
+```c
+typedef struct CBatIni CBatIni;
+```
+
+```c
+CBAT_API CBatIni *cbat_ini_new(void);
+```
+
+New empty settings object; NULL on OOM.
+
+```c
+CBAT_API CBatIni *cbat_ini_new_with(const CBatAllocator *allocator);
+```
+
+Same with retained allocator (NULL = default); allocator must outlive results.
+
+```c
+CBAT_API CBatError cbat_ini_parse(const char *text, size_t length, CBatIni **out, CBatParseInfo *info);
+```
+
+Parses length bytes (NULL allowed for length 0), optional UTF-8 BOM.
+Embedded NUL is invalid everywhere; other controls except tab are invalid
+in section names, keys and values.
+Duplicate sections merge and duplicate keys replace, retaining order.
+Empty named sections are retained. Output unchanged on failure; info may be NULL.
+
+```c
+CBAT_API CBatError cbat_ini_read_file(const char *path, CBatIni **out, CBatParseInfo *info);
+```
+
+Reads and parses a whole file; output unchanged on failure.
+
+```c
+CBAT_API void cbat_ini_free(CBatIni *ini);
+```
+
+Frees sections, keys, values and wrapper. NULL is ignored.
+
+```c
+CBAT_API const char *cbat_ini_get(const CBatIni *ini, const char *section, const char *key);
+```
+
+Borrowed value until mutation/free; NULL for missing/invalid arguments. "" section is global.
+
+```c
+CBAT_API CBatError cbat_ini_get_int(const CBatIni *ini, const char *section, const char *key, int64_t *out);
+```
+
+Typed lookup: NOT_FOUND if absent; numeric parser errors propagate; output unchanged on error.
+
+```c
+CBAT_API CBatError cbat_ini_get_double(const CBatIni *ini, const char *section, const char *key, double *out);
+```
+
+Same for ASCII decimal doubles, independent of numeric locale.
+
+```c
+CBAT_API CBatError cbat_ini_get_bool(const CBatIni *ini, const char *section, const char *key, bool *out);
+```
+
+Accepts true/false, yes/no, on/off, 1/0 case-insensitively, ignoring surrounding space/tab.
+
+```c
+CBAT_API CBatError cbat_ini_set(CBatIni *ini, const char *section, const char *key, const char *value);
+```
+
+Copies key/value into a section (created as needed). Names must not have
+edge space/tab, line breaks or controls. Section names exclude brackets;
+keys are nonempty and exclude '=', ':', '[' and ']' (internal spaces allowed),
+and cannot start with '#' or ';'. Values exclude line breaks/controls
+except tabs. Invalid input gives INVALID_ARGUMENT. Atomic on OOM.
+
+```c
+CBAT_API CBatError cbat_ini_to_string(const CBatIni *ini, CBatString **out);
+```
+
+New owned string using the config allocator. Writes global keys first,
+then named sections in insertion order; keys keep their order. Values are
+always quoted with backslash/quote escaping. Output unchanged on error.
+
+```c
+CBAT_API bool cbat_ini_next_section(const CBatIni *ini, size_t *iterator, const char **name);
+```
+
+Borrowed section names in insertion order, including "" if it has global keys. Start iterator at 0.
+
+```c
+CBAT_API bool cbat_ini_next_key(const CBatIni *ini, const char *section, size_t *iterator, const char **key, const char **value);
+```
+
+Borrowed keys/values in section order. Start iterator at 0; key/value outputs may be NULL.
 
 
 ## json

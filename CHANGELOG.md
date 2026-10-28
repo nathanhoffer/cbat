@@ -23,6 +23,8 @@ Versions use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Ordered INI settings with comments, quoted values, typed lookups, atomic
+  updates, serialization, custom allocators, and a settings recipe.
 - Percent/form encoding, strict decoding, URI-reference parsing with IPv6
   literals and validated ports, and owned query dictionaries with binary values.
 - `CBatBytes` binary buffers and `CBatByteReader` checked cursors, explicit

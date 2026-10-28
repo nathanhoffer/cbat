@@ -55,6 +55,7 @@ and header documentation.
 | `cbat/file.h` | `open()` | read/write whole files, line reader, copy |
 | `cbat/bytes.h` | `bytes`, `struct` | binary buffers, endian-aware integers/floats, checked read cursors |
 | `cbat/url.h` | `urllib.parse` | percent/form encoding, URI components, owned query dictionaries |
+| `cbat/ini.h` | `configparser` | ordered INI sections, quoted values, typed settings, serialization |
 | `cbat/json.h` | `json` | DOM, error line/column, JSON Pointer, pretty printing |
 | `cbat/csv.h` | `csv` | RFC 4180 reader (in-memory or streaming) and writer |
 | `cbat/encoding.h` | `base64`, `binascii` | Base64 (standard and URL-safe), hex |

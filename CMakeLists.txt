@@ -37,6 +37,7 @@ set(CBAT_MODULES
     file
     bytes
     url
+    ini
     encoding
     csv
     json
