@@ -1,0 +1,25 @@
+if(NOT CMAKE_C_COMPILER_ID STREQUAL "Clang")
+    message(FATAL_ERROR "CBAT_FUZZ requires Clang with the libFuzzer and ASan runtimes")
+endif()
+
+# Separate instrumentation keeps normal tests/consumers independent of libFuzzer.
+set(CBAT_FUZZ_SOURCES ${CBAT_SOURCES})
+list(TRANSFORM CBAT_FUZZ_SOURCES PREPEND "${PROJECT_SOURCE_DIR}/")
+add_library(cbat_fuzz_library STATIC ${CBAT_FUZZ_SOURCES})
+target_include_directories(cbat_fuzz_library PUBLIC "${PROJECT_SOURCE_DIR}/include")
+cbat_set_standard(cbat_fuzz_library)
+cbat_set_warnings(cbat_fuzz_library)
+target_compile_options(cbat_fuzz_library PRIVATE
+    -fsanitize=fuzzer-no-link,address,undefined -fno-omit-frame-pointer)
+if(CBAT_HAVE_LIBM)
+    target_link_libraries(cbat_fuzz_library PUBLIC m)
+endif()
+foreach(name json csv datetime base64 utf8)
+    add_executable(fuzz_${name} fuzz_${name}.c)
+    cbat_set_standard(fuzz_${name})
+    cbat_set_warnings(fuzz_${name})
+    target_compile_options(fuzz_${name} PRIVATE
+        -fsanitize=fuzzer,address,undefined -fno-omit-frame-pointer)
+    target_link_options(fuzz_${name} PRIVATE -fsanitize=fuzzer,address,undefined)
+    target_link_libraries(fuzz_${name} PRIVATE cbat_fuzz_library)
+endforeach()

@@ -482,6 +482,8 @@ CBAT_API CBatError cbat_csv_append_row(CBatString *out, const char *const *field
 
 Appends one row to `out`, quoting fields that contain the delimiter, the
 quote character, a line break, or leading/trailing spaces.
+A single empty field is quoted so it round-trips as a record, not a blank
+line. NULL fields are treated as empty strings.
 
 ```c
 CBAT_API CBatError cbat_csv_append_row_list(CBatString *out, const CBatList *fields, const CBatCsvOptions *options);

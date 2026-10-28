@@ -111,6 +111,30 @@ CBAT_TEST(test_write_rows_and_round_trip) {
     cbat_string_free(out);
 }
 
+CBAT_TEST(test_single_empty_field_round_trip) {
+    const char *empty[] = {""};
+    const char *null_field[] = {NULL};
+    CBatList *rows = NULL;
+    CBatString *out = cbat_string_new();
+    CBatList *fields = cbat_list_new(sizeof(CBatString *));
+    CBatString *value = NULL;
+    CBAT_REQUIRE_NOT_NULL(out);
+    CBAT_REQUIRE_NOT_NULL(fields);
+    CBAT_REQUIRE_OK(cbat_csv_append_row(out, empty, 1, NULL));
+    CBAT_REQUIRE_OK(cbat_csv_append_row(out, null_field, 1, NULL));
+    CBAT_REQUIRE_OK(cbat_list_push(fields, &value));
+    CBAT_REQUIRE_OK(cbat_csv_append_row_list(out, fields, NULL));
+    CBAT_CHECK_EQ_STR(out->data, "\"\"\n\"\"\n\"\"\n");
+    CBAT_REQUIRE_OK(cbat_csv_parse(out->data, out->length, NULL, &rows, NULL));
+    CBAT_REQUIRE_EQ_SIZE(cbat_list_length(rows), 3);
+    CBAT_CHECK_EQ_STR(field(rows, 0, 0), "");
+    CBAT_CHECK_EQ_STR(field(rows, 1, 0), "");
+    CBAT_CHECK_EQ_STR(field(rows, 2, 0), "");
+    cbat_list_free(rows);
+    cbat_list_free(fields);
+    cbat_string_free(out);
+}
+
 CBAT_TEST(test_file_and_streaming_reader) {
     CBatString *dir = NULL;
     CBatString *path;
@@ -169,6 +193,7 @@ static const CBatTestCase tests[] = {
     CBAT_TEST_ENTRY(test_unterminated_quote_reports_position),
     CBAT_TEST_ENTRY(test_lenient_quotes),
     CBAT_TEST_ENTRY(test_write_rows_and_round_trip),
+    CBAT_TEST_ENTRY(test_single_empty_field_round_trip),
     CBAT_TEST_ENTRY(test_file_and_streaming_reader),
     CBAT_TEST_ENTRY(test_out_of_memory),
 };

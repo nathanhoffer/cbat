@@ -16,6 +16,7 @@ option(CBAT_BUILD_COOKBOOK "Build and run the cookbook recipes as tests" ${CBAT_
 option(CBAT_WERROR "Treat compiler warnings as errors" OFF)
 option(CBAT_SANITIZE "Build with AddressSanitizer + UBSan (GCC/Clang, non-Windows)" OFF)
 option(CBAT_INSTALL "Generate install rules" ${CBAT_TOP_LEVEL})
+option(CBAT_FUZZ "Build libFuzzer parser targets (Clang with ASan/UBSan)" OFF)
 
 # Modules in dependency order. Each has include/cbat/<m>.h, src/<m>.c and
 # tests/test_<m>.c.
@@ -167,6 +168,10 @@ if(CBAT_BUILD_COOKBOOK)
         add_test(NAME "cookbook/${recipe_name}" COMMAND ${recipe_target}
                  WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/cookbook")
     endforeach()
+endif()
+
+if(CBAT_FUZZ)
+    add_subdirectory(fuzz)
 endif()
 
 # ---- Install ---------------------------------------------------------------

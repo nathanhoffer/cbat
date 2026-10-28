@@ -353,10 +353,11 @@ static bool cbat__csv_needs_quotes(const char *field, size_t length,
 }
 
 static CBatError cbat__csv_append_field(CBatString *out, const char *field, size_t length,
-                                        const CBatCsvOptions *options) {
+                                        const CBatCsvOptions *options, bool only_field) {
     CBatError err;
     size_t i;
-    if (!cbat__csv_needs_quotes(field, length, options)) {
+    /* A single empty field must not become a blank (skipped) record. */
+    if (!(only_field && length == 0) && !cbat__csv_needs_quotes(field, length, options)) {
         return cbat_string_append_length(out, field, length);
     }
     err = cbat_string_append_char(out, options->quote);
@@ -390,7 +391,7 @@ CBatError cbat_csv_append_row(CBatString *out, const char *const *fields, size_t
             err = cbat_string_append_char(out, resolved.delimiter);
         }
         if (err == CBAT_OK) {
-            err = cbat__csv_append_field(out, field, strlen(field), &resolved);
+            err = cbat__csv_append_field(out, field, strlen(field), &resolved, count == 1);
         }
     }
     if (err == CBAT_OK) {
@@ -417,8 +418,10 @@ CBatError cbat_csv_append_row_list(CBatString *out, const CBatList *fields,
         if (i > 0) {
             err = cbat_string_append_char(out, resolved.delimiter);
         }
-        if (err == CBAT_OK && field != NULL) {
-            err = cbat__csv_append_field(out, field->data, field->length, &resolved);
+        if (err == CBAT_OK) {
+            err = cbat__csv_append_field(out, field == NULL ? "" : field->data,
+                                          field == NULL ? 0 : field->length, &resolved,
+                                          fields->length == 1);
         }
     }
     if (err == CBAT_OK) {

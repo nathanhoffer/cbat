@@ -72,6 +72,8 @@ CBAT_API void cbat_csv_reader_close(CBatCsvReader *reader);
 /**
  * Appends one row to `out`, quoting fields that contain the delimiter, the
  * quote character, a line break, or leading/trailing spaces.
+ * A single empty field is quoted so it round-trips as a record, not a blank
+ * line. NULL fields are treated as empty strings.
  */
 CBAT_API CBatError cbat_csv_append_row(CBatString *out, const char *const *fields, size_t count,
                                        const CBatCsvOptions *options);

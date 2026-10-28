@@ -6,6 +6,33 @@ on:
   workflow_dispatch:
 
 jobs:
+  fuzz:
+    name: Fuzz (60 s each)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_C_COMPILER=clang -DCMAKE_BUILD_TYPE=Debug -DCBAT_FUZZ=ON -DCBAT_WERROR=ON
+      - name: Build fuzz targets
+        run: cmake --build build --parallel
+      - name: Fuzz parsers
+        shell: bash
+        run: |
+          mkdir -p findings
+          cp -R fuzz/corpus build/corpus
+          failed=0
+          for target in json csv datetime base64 utf8; do
+            mkdir -p findings/$target
+            build/fuzz/fuzz_$target build/corpus/$target -max_total_time=60 -max_len=4096 -artifact_prefix=findings/$target/ > findings/$target.log 2>&1 || failed=1
+            tail -n 8 findings/$target.log
+          done
+          exit $failed
+      - uses: actions/upload-artifact@v6
+        if: failure()
+        with:
+          name: fuzz-findings
+          path: findings/
+
   api-docs:
     name: API reference
     runs-on: ubuntu-24.04

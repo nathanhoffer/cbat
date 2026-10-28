@@ -13,8 +13,15 @@ Versions use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Line reads interrupted by allocation failure can be retried without losing
   the partial line. I/O errors are terminal for the reader.
 
+### Fixed
+
+- A CSV record containing a single empty field is now quoted when written,
+  preserving the record when parsed again instead of treating it as a blank line.
+
 ### Added
 
+- Opt-in libFuzzer targets for JSON, CSV, ISO dates, Base64 and UTF-8, with
+  seed corpora and a Linux CI sanitizer run for each parser.
 - A native example for writing tests, allocation failure injection, filtering,
   and leak detection under `docs/examples/`.
 
