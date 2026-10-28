@@ -52,7 +52,7 @@ global surprises, no aborts on bad input, and every failure reported as a value.
 | Core | `base.h` (errors, allocators, arena, checked math), `test.h` |
 | Containers | `string.h` (+UTF-8), `list.h`, `heap.h`, `dict.h`, `map.h`, `set.h`, `deque.h`, `sort.h` |
 | Files & OS | `path.h`, `file.h`, `fs.h` |
-| Data formats | `json.h`, `csv.h`, `encoding.h` (base64, hex) |
+| Data formats | `json.h`, `csv.h`, `bytes.h` (binary/endian I/O), `encoding.h` (base64, hex) |
 | Utilities | `random.h`, `stats.h` (math/statistics), `time.h`, `log.h`, `args.h`, `hash.h` |
 
 **Tier 2 (later, explicitly second-class):** `ndarray` (numpy-like n-d arrays),

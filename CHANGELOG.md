@@ -23,6 +23,8 @@ Versions use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `CBatBytes` binary buffers and `CBatByteReader` checked cursors, explicit
+  little/big-endian integers and IEEE floats, binary file helpers, and a BMP recipe.
 - `CBatHeap` min-priority queue, allocation-free push/pop combination,
   linear-time construction, smallest/largest list selection, and a Dijkstra recipe.
 - Bounded splitting, line splitting, partition, ASCII predicates, natural

@@ -53,6 +53,7 @@ and header documentation.
 | `cbat/path.h` | `os.path`, `pathlib` | join, basename, dirname, extension, normalize |
 | `cbat/fs.h` | `os`, `shutil`, `tempfile` | mkdir -p, list, walk, rename, rmtree, temp dirs (UTF-8 paths on Windows) |
 | `cbat/file.h` | `open()` | read/write whole files, line reader, copy |
+| `cbat/bytes.h` | `bytes`, `struct` | binary buffers, endian-aware integers/floats, checked read cursors |
 | `cbat/json.h` | `json` | DOM, error line/column, JSON Pointer, pretty printing |
 | `cbat/csv.h` | `csv` | RFC 4180 reader (in-memory or streaming) and writer |
 | `cbat/encoding.h` | `base64`, `binascii` | Base64 (standard and URL-safe), hex |
