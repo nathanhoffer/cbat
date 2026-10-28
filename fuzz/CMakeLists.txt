@@ -3,9 +3,7 @@ if(NOT CMAKE_C_COMPILER_ID STREQUAL "Clang")
 endif()
 
 # Separate instrumentation keeps normal tests/consumers independent of libFuzzer.
-set(CBAT_FUZZ_SOURCES ${CBAT_SOURCES})
-list(TRANSFORM CBAT_FUZZ_SOURCES PREPEND "${PROJECT_SOURCE_DIR}/")
-add_library(cbat_fuzz_library STATIC ${CBAT_FUZZ_SOURCES})
+add_library(cbat_fuzz_library STATIC ${CBAT_SOURCES})
 target_include_directories(cbat_fuzz_library PUBLIC "${PROJECT_SOURCE_DIR}/include")
 cbat_set_standard(cbat_fuzz_library)
 cbat_set_warnings(cbat_fuzz_library)
