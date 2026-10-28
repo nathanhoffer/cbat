@@ -1,0 +1,101 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  desktop:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux GCC + sanitizers
+            os: ubuntu-latest
+            cc: gcc
+            flags: -DCBAT_SANITIZE=ON
+          - name: Linux Clang + sanitizers
+            os: ubuntu-latest
+            cc: clang
+            flags: -DCBAT_SANITIZE=ON
+          - name: Linux shared library
+            os: ubuntu-latest
+            cc: gcc
+            flags: -DBUILD_SHARED_LIBS=ON
+          - name: macOS Apple Clang + sanitizers
+            os: macos-latest
+            cc: clang
+            flags: -DCBAT_SANITIZE=ON
+          - name: Windows MSVC
+            os: windows-latest
+            cc: cl
+            flags: ""
+          - name: Windows MSVC shared library
+            os: windows-latest
+            cc: cl
+            flags: -DBUILD_SHARED_LIBS=ON
+          - name: Windows clang-cl
+            os: windows-latest
+            cc: clang-cl
+            flags: -T ClangCL
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure (Unix)
+        if: runner.os != 'Windows'
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_COMPILER=${{ matrix.cc }} -DCBAT_WERROR=ON ${{ matrix.flags }}
+      - name: Configure (Windows)
+        if: runner.os == 'Windows'
+        run: cmake -S . -B build -DCBAT_WERROR=ON ${{ matrix.flags }}
+      - name: Build
+        run: cmake --build build --config Debug --parallel
+      - name: Test
+        run: ctest --test-dir build -C Debug --output-on-failure
+
+  ios:
+    name: iOS (cross-compile)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: >
+          cmake -S . -B build -G Xcode
+          -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_ARCHITECTURES=arm64
+          -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0
+          -DCBAT_BUILD_TESTS=OFF -DCBAT_BUILD_COOKBOOK=OFF -DCBAT_WERROR=ON
+      - name: Build
+        run: cmake --build build --config Release -- CODE_SIGNING_ALLOWED=NO
+
+  android:
+    name: Android NDK (${{ matrix.abi }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        abi: [arm64-v8a, x86_64]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: >
+          cmake -S . -B build
+          -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_LATEST_HOME/build/cmake/android.toolchain.cmake
+          -DANDROID_ABI=${{ matrix.abi }} -DANDROID_PLATFORM=android-24
+          -DCBAT_BUILD_TESTS=ON -DCBAT_BUILD_COOKBOOK=ON -DCBAT_WERROR=ON
+      - name: Build (tests compile; they run on devices, not the CI host)
+        run: cmake --build build --parallel
+
+  single-header:
+    name: Single header
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate dist/cbat.h
+        run: python3 tools/amalgamate.py --output dist/cbat.h
+      - name: Compile as C99 with strict warnings
+        run: |
+          gcc -std=c99 -Wall -Wextra -Wpedantic -Werror -Idist tests/amalgamation_main.c -lm -o amalgamation
+          ./amalgamation
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cbat-single-header
+          path: dist/cbat.h
