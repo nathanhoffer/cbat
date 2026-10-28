@@ -5,6 +5,7 @@
 #include "cbat/string.h"
 
 #include <math.h>
+#include <locale.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -780,51 +781,234 @@ CBatError cbat_string_to_int64(const char *text, int64_t *out) {
     return cbat_string_to_int64_base(text, 10, out);
 }
 
+static bool cbat__number_word(const char *a, const char *end, const char *word) {
+    while (a < end && *word != '\0') {
+        char c = *a++;
+        if (c >= 'A' && c <= 'Z') c = (char)(c + ('a' - 'A'));
+        if (c != *word++) return false;
+    }
+    return a == end && *word == '\0';
+}
+
 CBatError cbat_string_to_double(const char *text, double *out) {
-    char *end;
+    const char *start, *end, *p, *point_at = NULL;
+    const char *point;
+    const struct lconv *conv;
+    size_t digits = 0, point_length, length, bytes;
+    bool negative = false;
+    char small[128], *localized = small, *after;
     double value;
-    const char *p = text;
-    if (text == NULL || out == NULL) {
-        return CBAT_ERR_INVALID_ARGUMENT;
+    if (text == NULL || out == NULL) return CBAT_ERR_INVALID_ARGUMENT;
+    start = text;
+    while (cbat__string_is_space(*start)) start++;
+    end = start + strlen(start);
+    while (end > start && cbat__string_is_space(end[-1])) end--;
+    p = start;
+    if (p < end && (*p == '-' || *p == '+')) { negative = *p == '-'; p++; }
+    if (cbat__number_word(p, end, "inf") || cbat__number_word(p, end, "infinity")) {
+        *out = negative ? -HUGE_VAL : HUGE_VAL;
+        return CBAT_OK;
     }
-    while (cbat__string_is_space(*p)) {
+    if (cbat__number_word(p, end, "nan")) { *out = negative ? -NAN : NAN; return CBAT_OK; }
+    while (p < end && *p >= '0' && *p <= '9') { digits++; p++; }
+    if (p < end && *p == '.') {
+        point_at = p++;
+        while (p < end && *p >= '0' && *p <= '9') { digits++; p++; }
+    }
+    if (digits == 0) return CBAT_ERR_PARSE;
+    if (p < end && (*p == 'e' || *p == 'E')) {
+        const char *exponent;
         p++;
+        if (p < end && (*p == '+' || *p == '-')) p++;
+        exponent = p;
+        while (p < end && *p >= '0' && *p <= '9') p++;
+        if (p == exponent) return CBAT_ERR_PARSE;
     }
-    if (*p == '\0') {
-        return CBAT_ERR_PARSE;
-    }
-    /* Hex floats are a C-ism that surprises people parsing data; reject. */
-    {
-        const char *q = p;
-        if (*q == '+' || *q == '-') {
-            q++;
+    if (p != end) return CBAT_ERR_PARSE;
+    /* Validate ASCII grammar first, then translate only the decimal point for
+     * strtod. No setlocale calls, including transient process-wide changes.
+     * Locale decimal points may contain more than one byte. */
+    conv = localeconv();
+    point = conv != NULL && conv->decimal_point != NULL && conv->decimal_point[0] != '\0' ?
+        conv->decimal_point : ".";
+    if (point_at == NULL || strcmp(point, ".") == 0) {
+        value = strtod(start, &after);
+        if (after != end) return CBAT_ERR_PARSE;
+    } else {
+        point_length = strlen(point);
+        length = (size_t)(end - start);
+        if (!cbat_size_add(length, point_length, &bytes)) return CBAT_ERR_OVERFLOW;
+        if (bytes > sizeof(small)) {
+            localized = (char *)cbat_alloc(NULL, bytes);
+            if (localized == NULL) return CBAT_ERR_NO_MEMORY;
         }
-        if (q[0] == '0' && (q[1] == 'x' || q[1] == 'X')) {
-            return CBAT_ERR_PARSE;
+        memcpy(localized, start, (size_t)(point_at - start));
+        memcpy(localized + (point_at - start), point, point_length);
+        memcpy(localized + (point_at - start) + point_length, point_at + 1, (size_t)(end - point_at - 1));
+        localized[bytes - 1] = '\0';
+        value = strtod(localized, &after);
+        {
+            bool consumed = after == localized + bytes - 1;
+            if (localized != small) cbat_free(localized);
+            if (!consumed) return CBAT_ERR_PARSE;
         }
     }
-    value = strtod(p, &end);
-    if (end == p) {
-        return CBAT_ERR_PARSE;
-    }
-    while (cbat__string_is_space(*end)) {
-        end++;
-    }
-    if (*end != '\0') {
-        return CBAT_ERR_PARSE;
-    }
-    if (value == HUGE_VAL || value == -HUGE_VAL) {
-        /* Only an overflow if the text did not literally say infinity. */
-        const char *q = p;
-        if (*q == '+' || *q == '-') {
-            q++;
-        }
-        if (*q != 'i' && *q != 'I') {
-            return CBAT_ERR_OVERFLOW;
-        }
-    }
+    if (value == HUGE_VAL || value == -HUGE_VAL) return CBAT_ERR_OVERFLOW;
     *out = value;
     return CBAT_OK;
+}
+
+CBatError cbat_string_to_uint64(const char *text, uint64_t *out) {
+    const char *p = text;
+    uint64_t value = 0;
+    bool any = false, overflow = false;
+    if (text == NULL || out == NULL) return CBAT_ERR_INVALID_ARGUMENT;
+    while (cbat__string_is_space(*p)) p++;
+    if (*p == '+') p++;
+    while (*p >= '0' && *p <= '9') {
+        unsigned digit = (unsigned)(*p++ - '0');
+        if (value > (UINT64_MAX - digit) / 10) overflow = true;
+        if (!overflow) value = value * 10 + digit;
+        any = true;
+    }
+    while (cbat__string_is_space(*p)) p++;
+    if (!any || *p != '\0') return CBAT_ERR_PARSE;
+    if (overflow) return CBAT_ERR_OVERFLOW;
+    *out = value;
+    return CBAT_OK;
+}
+
+size_t cbat_format_int64(int64_t value, char out[21]) {
+    char reverse[20];
+    size_t count = 0, position = 0;
+    uint64_t magnitude = value < 0 ? (uint64_t)(-(value + 1)) + 1 : (uint64_t)value;
+    if (out == NULL) return 0;
+    do { reverse[count++] = (char)('0' + magnitude % 10); magnitude /= 10; } while (magnitude != 0);
+    if (value < 0) out[position++] = '-';
+    while (count != 0) out[position++] = reverse[--count];
+    out[position] = '\0';
+    return position;
+}
+
+/* Turn an integer significand times 10^power into its shorter conventional
+ * decimal notation. At most 17 significant digits and a binary64 exponent. */
+static size_t cbat__double_notation(uint64_t significand, int power, bool negative, char out[32]) {
+    char digits[21], scientific[32], fixed[32], exponent[21];
+    size_t count = cbat_format_int64((int64_t)significand, digits);
+    int decimal_exponent = power + (int)count - 1;
+    size_t n = 0, i;
+    int point;
+    while (count > 1 && digits[count - 1] == '0') count--;
+    if (negative) scientific[n++] = '-';
+    scientific[n++] = digits[0];
+    if (count > 1) {
+        scientific[n++] = '.';
+        for (i = 1; i < count; i++) scientific[n++] = digits[i];
+    }
+    if (decimal_exponent != 0) {
+        size_t e = cbat_format_int64(decimal_exponent, exponent);
+        scientific[n++] = 'e';
+        memcpy(scientific + n, exponent, e); n += e;
+    }
+    scientific[n] = '\0';
+    point = decimal_exponent + 1;
+    {
+        size_t fixed_length = (negative ? 1u : 0u) +
+            (point <= 0 ? 2 + (size_t)(-point) + count :
+             point >= (int)count ? (size_t)point : count + 1);
+        if (fixed_length <= n) {
+            size_t pos = 0;
+            if (negative) fixed[pos++] = '-';
+            if (point <= 0) {
+                fixed[pos++] = '0'; fixed[pos++] = '.';
+                for (i = 0; i < (size_t)(-point); i++) fixed[pos++] = '0';
+                memcpy(fixed + pos, digits, count); pos += count;
+            } else {
+                for (i = 0; i < count || i < (size_t)point; i++) {
+                    if (i == (size_t)point && i < count) fixed[pos++] = '.';
+                    fixed[pos++] = i < count ? digits[i] : '0';
+                }
+            }
+            fixed[pos] = '\0';
+            memcpy(out, fixed, pos + 1);
+            return pos;
+        }
+    }
+    memcpy(out, scientific, n + 1);
+    return n;
+}
+
+size_t cbat_format_double(double value, char out[32]) {
+    char raw[128], candidate[64], digits[21], exponent[21], best[32];
+    int precision;
+    bool negative = signbit(value) != 0;
+    if (out == NULL) return 0;
+    if (isnan(value)) { memcpy(out, "nan", 4); return 3; }
+    if (isinf(value)) { memcpy(out, negative ? "-inf" : "inf", negative ? 5 : 4); return negative ? 4 : 3; }
+    if (value == 0) { memcpy(out, negative ? "-0" : "0", negative ? 3 : 2); return negative ? 2 : 1; }
+    for (precision = 1; precision <= 17; precision++) {
+        const char *e, *p;
+        uint64_t significand = 0;
+        int power, adjustment;
+        size_t best_length = SIZE_MAX;
+        int written = snprintf(raw, sizeof(raw), "%.*e", precision - 1, fabs(value));
+        if (written < 0 || (size_t)written >= sizeof(raw)) continue;
+        e = strrchr(raw, 'e');
+        if (e == NULL) continue;
+        power = (int)strtol(e + 1, NULL, 10) - (precision - 1);
+        for (p = raw; p < e; p++) {
+            if (*p >= '0' && *p <= '9') significand = significand * 10 + (unsigned)(*p - '0');
+        }
+        /* Check the nearest decimal grid point and its neighbors. This also
+         * covers the asymmetric rounding interval at powers of two. Parsing
+         * integer-significand exponent form needs no locale decimal point. */
+        for (adjustment = 0; adjustment < 3; adjustment++) {
+            uint64_t trial = adjustment == 1 ? significand - 1 : adjustment == 2 ? significand + 1 : significand;
+            size_t pos = 0, length, exp_length;
+            double parsed;
+            if (trial == 0) continue;
+            length = cbat_format_int64((int64_t)trial, digits);
+            exp_length = cbat_format_int64(power, exponent);
+            if (negative) candidate[pos++] = '-';
+            memcpy(candidate + pos, digits, length); pos += length;
+            candidate[pos++] = 'e';
+            memcpy(candidate + pos, exponent, exp_length + 1);
+            parsed = strtod(candidate, NULL);
+            if (parsed == value) {
+                char rendered[32];
+                size_t rendered_length = cbat__double_notation(trial, power, negative, rendered);
+                if (rendered_length < best_length) {
+                    memcpy(best, rendered, rendered_length + 1);
+                    best_length = rendered_length;
+                }
+            }
+        }
+        if (best_length != SIZE_MAX) { memcpy(out, best, best_length + 1); return best_length; }
+    }
+    out[0] = '\0';
+    return 0;
+}
+
+CBatError cbat_string_append_double(CBatString *s, double value) {
+    char buffer[32];
+    size_t length;
+    if (s == NULL) return CBAT_ERR_INVALID_ARGUMENT;
+    length = cbat_format_double(value, buffer);
+    return length == 0 ? CBAT_ERR_UNSUPPORTED : cbat_string_append_length(s, buffer, length);
+}
+
+CBatError cbat_string_append_int64_grouped(CBatString *s, int64_t value, char separator) {
+    char plain[21], grouped[27];
+    size_t length, i, pos = 0, start;
+    if (s == NULL) return CBAT_ERR_INVALID_ARGUMENT;
+    length = cbat_format_int64(value, plain);
+    start = plain[0] == '-' ? 1 : 0;
+    if (start != 0) grouped[pos++] = '-';
+    for (i = start; i < length; i++) {
+        if (separator != 0 && i > start && (length - i) % 3 == 0) grouped[pos++] = separator;
+        grouped[pos++] = plain[i];
+    }
+    return cbat_string_append_length(s, grouped, pos);
 }
 
 /* ---- UTF-8 -------------------------------------------------------------- */

@@ -36,10 +36,10 @@ CBAT_TEST(test_parse_scalars) {
     check_round_trip("-0", "0");
     check_round_trip("3.5", "3.5");
     check_round_trip("0.1", "0.1");
-    check_round_trip("1e3", "1000");
+    check_round_trip("1e3", "1e3");
     check_round_trip("-2.5E-3", "-0.0025");
     check_round_trip("9223372036854775807", "9223372036854775807");
-    check_round_trip("12345678901234567890", "1.2345678901234567e+19");
+    check_round_trip("12345678901234567890", "12345678901234567000");
     check_round_trip("\"hi\"", "\"hi\"");
 }
 

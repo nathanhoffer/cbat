@@ -8,6 +8,9 @@ Versions use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Decimal double parsing accepts the same ASCII syntax across numeric
+  locales. JSON shares this parser and now uses shortest round-trip output;
+  equivalent numeric JSON text may use different fixed/scientific notation.
 - File-backed line readers scan buffered chunks instead of reading one byte
   at a time. Readers over borrowed streams preserve interactive behavior.
 - Line reads interrupted by allocation failure can be retried without losing
@@ -20,6 +23,8 @@ Versions use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Locale-independent double/int64 formatting, uint64 parsing, and grouped
+  int64 output, with exact binary64 round-trip coverage.
 - Dictionary Counter helpers (`increment`, stable `most_common`),
   get-or-insert, shallow copy/update, set copy and symmetric difference.
 - `CBatMap` with fixed-size keys/values, integer-key convenience macros,
@@ -29,9 +34,9 @@ Versions use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - A native example for writing tests, allocation failure injection, filtering,
   and leak detection under `docs/examples/`.
 
-## [0.1.0] - Unreleased
+## [0.1.0] - 2026-10-27
 
-Initial version; the release tag has not yet been published.
+Initial release.
 
 ### Added
 
@@ -47,5 +52,5 @@ Initial version; the release tag has not yet been published.
   single-header distribution.
 - CI builds for Linux, macOS, Windows, iOS, and Android.
 
-[Unreleased]: https://github.com/nathanhoffer/cbat/commits/main
-[0.1.0]: https://github.com/nathanhoffer/cbat/tree/main
+[Unreleased]: https://github.com/nathanhoffer/cbat/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/nathanhoffer/cbat/releases/tag/v0.1.0

@@ -1,8 +1,11 @@
 #include <math.h>
+#include <float.h>
+#include <locale.h>
 #include <string.h>
 
 #include "cbat/string.h"
 #include "cbat/test.h"
+#include "cbat/random.h"
 
 CBAT_TEST(test_new_from_and_free) {
     CBatString *a = cbat_string_new();
@@ -387,6 +390,132 @@ CBAT_TEST(test_string_in_arena) {
     cbat_arena_free(arena);
 }
 
+CBAT_TEST(test_uint64_and_integer_formatting) {
+    uint64_t value = 7;
+    char text[21];
+    CBatString *s = cbat_string_new();
+    CBAT_REQUIRE_NOT_NULL(s);
+    CBAT_CHECK_OK(cbat_string_to_uint64(" +18446744073709551615 \t", &value));
+    CBAT_CHECK_EQ_UINT(value, UINT64_MAX);
+    CBAT_CHECK_ERR(cbat_string_to_uint64("18446744073709551616", &value), CBAT_ERR_OVERFLOW);
+    CBAT_CHECK_EQ_UINT(value, UINT64_MAX);
+    CBAT_CHECK_ERR(cbat_string_to_uint64("18446744073709551616x", &value), CBAT_ERR_PARSE);
+    CBAT_CHECK_ERR(cbat_string_to_uint64("-0", &value), CBAT_ERR_PARSE);
+    CBAT_CHECK_ERR(cbat_string_to_uint64("+", &value), CBAT_ERR_PARSE);
+    CBAT_CHECK_ERR(cbat_string_to_uint64("  ", &value), CBAT_ERR_PARSE);
+    CBAT_CHECK_ERR(cbat_string_to_uint64("0x10", &value), CBAT_ERR_PARSE);
+    CBAT_CHECK_ERR(cbat_string_to_uint64(NULL, &value), CBAT_ERR_INVALID_ARGUMENT);
+    CBAT_CHECK_ERR(cbat_string_to_uint64("1", NULL), CBAT_ERR_INVALID_ARGUMENT);
+    CBAT_CHECK_EQ_SIZE(cbat_format_int64(INT64_MIN, text), 20);
+    CBAT_CHECK_EQ_STR(text, "-9223372036854775808");
+    CBAT_CHECK_EQ_SIZE(cbat_format_int64(INT64_MAX, text), 19);
+    CBAT_CHECK_EQ_STR(text, "9223372036854775807");
+    CBAT_CHECK_EQ_SIZE(cbat_format_int64(0, text), 1);
+    CBAT_CHECK_EQ_STR(text, "0");
+    CBAT_CHECK_EQ_SIZE(cbat_format_int64(1, NULL), 0);
+    CBAT_REQUIRE_OK(cbat_string_append_int64_grouped(s, INT64_MIN, ','));
+    CBAT_CHECK_EQ_STR(s->data, "-9,223,372,036,854,775,808");
+    cbat_string_clear(s);
+    CBAT_REQUIRE_OK(cbat_string_append_int64_grouped(s, 1234567, '_'));
+    CBAT_CHECK_EQ_STR(s->data, "1_234_567");
+    cbat_string_clear(s);
+    CBAT_REQUIRE_OK(cbat_string_append_int64_grouped(s, -1234, 0));
+    CBAT_CHECK_EQ_STR(s->data, "-1234");
+    CBAT_CHECK_ERR(cbat_string_append_int64_grouped(NULL, 1, ','), CBAT_ERR_INVALID_ARGUMENT);
+    cbat_string_free(s);
+}
+
+CBAT_TEST(test_shortest_double_notation) {
+    const double values[] = {0.0, -0.0, 0.1, 1.25, 10.0, 1000.0, 0.0001, DBL_MAX, DBL_MIN,
+        4.9406564584124654e-324, 9007199254740992.0, 1.2345678901234567};
+    size_t i;
+    char text[32];
+    CBatString *s = cbat_string_new();
+    CBAT_REQUIRE_NOT_NULL(s);
+    for (i = 0; i < CBAT_ARRAY_LEN(values); i++) {
+        double parsed = 0;
+        size_t length = cbat_format_double(values[i], text);
+        CBAT_CHECK(length > 0 && length < sizeof(text));
+        CBAT_CHECK_EQ_SIZE(length, strlen(text));
+        CBAT_REQUIRE_OK(cbat_string_to_double(text, &parsed));
+        CBAT_CHECK_EQ_MEM(&parsed, &values[i], sizeof(double));
+    }
+    cbat_format_double(0.1, text); CBAT_CHECK_EQ_STR(text, "0.1");
+    cbat_format_double(10.0, text); CBAT_CHECK_EQ_STR(text, "10");
+    cbat_format_double(1000.0, text); CBAT_CHECK_EQ_STR(text, "1e3");
+    cbat_format_double(0.0001, text); CBAT_CHECK_EQ_STR(text, "1e-4");
+    cbat_format_double(-0.0, text); CBAT_CHECK_EQ_STR(text, "-0");
+    cbat_format_double(HUGE_VAL, text); CBAT_CHECK_EQ_STR(text, "inf");
+    cbat_format_double(-HUGE_VAL, text); CBAT_CHECK_EQ_STR(text, "-inf");
+    cbat_format_double(NAN, text); CBAT_CHECK_EQ_STR(text, "nan");
+    CBAT_CHECK_EQ_SIZE(cbat_format_double(1.0, NULL), 0);
+    CBAT_REQUIRE_OK(cbat_string_append_double(s, 0.1));
+    CBAT_CHECK_EQ_STR(s->data, "0.1");
+    CBAT_CHECK_ERR(cbat_string_append_double(NULL, 1.0), CBAT_ERR_INVALID_ARGUMENT);
+    cbat_string_free(s);
+}
+
+CBAT_TEST(test_random_double_round_trips) {
+    CBatRandom rng;
+    size_t count = 0;
+    cbat_random_seed(&rng, 42);
+    while (count < 100000) {
+        uint64_t bits = cbat_random_u64(&rng);
+        double value, parsed;
+        char text[32];
+        memcpy(&value, &bits, sizeof(value));
+        if (!isfinite(value)) continue;
+        CBAT_REQUIRE(cbat_format_double(value, text) > 0);
+        CBAT_REQUIRE_OK(cbat_string_to_double(text, &parsed));
+        CBAT_REQUIRE(memcmp(&value, &parsed, sizeof(value)) == 0);
+        count++;
+    }
+}
+
+CBAT_TEST(test_numeric_locale_and_allocation_errors) {
+    const char *locales[] = {"de_DE.UTF-8", "de_DE.utf8", "German_Germany.1252", "de-DE"};
+    char *saved = cbat_strdup(NULL, setlocale(LC_NUMERIC, NULL));
+    CBatString *large = cbat_string_repeat("0", 300);
+    CBatString *output = cbat_string_from("123456789012345");
+    size_t i;
+    double value = 9;
+    bool available = false;
+    CBAT_REQUIRE_NOT_NULL(saved); CBAT_REQUIRE_NOT_NULL(large); CBAT_REQUIRE_NOT_NULL(output);
+    CBAT_REQUIRE_OK(cbat_string_insert(large, 0, "0."));
+    CBAT_REQUIRE_OK(cbat_string_append(large, "1"));
+    for (i = 0; i < CBAT_ARRAY_LEN(locales); i++) {
+        if (setlocale(LC_NUMERIC, locales[i]) != NULL) { available = true; break; }
+    }
+    if (available) {
+        char text[32];
+        CBatError err;
+        CBAT_CHECK_OK(cbat_string_to_double("1.25", &value));
+        CBAT_CHECK(value == 1.25);
+        CBAT_CHECK_ERR(cbat_string_to_double("1,25", &value), CBAT_ERR_PARSE);
+        cbat_format_double(1.25, text);
+        CBAT_CHECK_EQ_STR(text, "1.25");
+        if (strcmp(localeconv()->decimal_point, ".") != 0) {
+            value = 9;
+            cbat_test_fail_allocations_after(0);
+            err = cbat_string_to_double(large->data, &value);
+            cbat_test_stop_failing_allocations();
+            CBAT_CHECK_ERR(err, CBAT_ERR_NO_MEMORY);
+            CBAT_CHECK(value == 9);
+        }
+    }
+    CBAT_CHECK_NOT_NULL(setlocale(LC_NUMERIC, saved));
+    cbat_test_fail_allocations_after(0);
+    {
+        CBatError a = cbat_string_append_double(output, DBL_MAX);
+        CBatError b = cbat_string_append_int64_grouped(output, INT64_MIN, ',');
+        cbat_test_stop_failing_allocations();
+        CBAT_CHECK_ERR(a, CBAT_ERR_NO_MEMORY);
+        CBAT_CHECK_ERR(b, CBAT_ERR_NO_MEMORY);
+    }
+    CBAT_CHECK_EQ_STR(output->data, "123456789012345");
+    cbat_free(saved); cbat_string_free(large); cbat_string_free(output);
+}
+
 CBAT_TEST(test_out_of_memory) {
     size_t n;
     for (n = 0; n < 6; n++) {
@@ -432,6 +561,10 @@ static const CBatTestCase tests[] = {
     CBAT_TEST_ENTRY(test_utf8_count_and_validate),
     CBAT_TEST_ENTRY(test_append_codepoint),
     CBAT_TEST_ENTRY(test_string_in_arena),
+    CBAT_TEST_ENTRY(test_uint64_and_integer_formatting),
+    CBAT_TEST_ENTRY(test_shortest_double_notation),
+    CBAT_TEST_ENTRY(test_random_double_round_trips),
+    CBAT_TEST_ENTRY(test_numeric_locale_and_allocation_errors),
     CBAT_TEST_ENTRY(test_out_of_memory),
 };
 

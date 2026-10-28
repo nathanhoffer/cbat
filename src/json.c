@@ -5,7 +5,6 @@
  */
 #include "cbat/json.h"
 
-#include <locale.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -697,24 +696,15 @@ static CBatError cbat__json_parse_string(cbat__json_parser *p, CBatString *out) 
     }
 }
 
-/* strtod honours the C locale's decimal point; JSON always uses '.'. */
-static char cbat__json_decimal_point(void) {
-    const struct lconv *conv = localeconv();
-    return (conv != NULL && conv->decimal_point != NULL && conv->decimal_point[0] != '\0')
-               ? conv->decimal_point[0]
-               : '.';
-}
-
 static CBatError cbat__json_parse_number(cbat__json_parser *p, CBatJson **out) {
     size_t start = p->position;
     bool integral = true;
     char stack_buffer[64];
     char *buffer = stack_buffer;
     size_t length;
-    size_t i;
     double value;
     CBatJson *number;
-    char point;
+    CBatError err;
 
     if (cbat__json_peek(p) == '-') {
         p->position++;
@@ -776,20 +766,15 @@ static CBatError cbat__json_parse_number(cbat__json_parser *p, CBatJson **out) {
             return CBAT_OK;
         }
     }
-    point = cbat__json_decimal_point();
-    for (i = 0; point != '.' && i < length; i++) {
-        if (buffer[i] == '.') {
-            buffer[i] = point;
-        }
-    }
-    value = strtod(buffer, NULL);
+    err = cbat_string_to_double(buffer, &value);
     if (buffer != stack_buffer) {
         cbat_free(buffer);
     }
-    if (value == HUGE_VAL || value == -HUGE_VAL) {
+    if (err == CBAT_ERR_OVERFLOW) {
         p->position = start;
         return cbat__json_fail(p, "number is too large");
     }
+    if (err != CBAT_OK) return err;
     number = cbat_json_new_number(value);
     if (number == NULL) {
         return CBAT_ERR_NO_MEMORY;
@@ -1083,31 +1068,16 @@ static CBatError cbat__json_write_string(CBatString *out, const char *text, size
 }
 
 static CBatError cbat__json_write_number(CBatString *out, const CBatJson *value) {
-    char buffer[40];
-    int precision;
-    char point;
-    size_t i;
+    char buffer[21];
     double d = value->as.number.value;
     if (value->is_integer) {
-        return cbat_string_append_format(out, "%lld", (long long)value->as.number.integer);
+        size_t length = cbat_format_int64(value->as.number.integer, buffer);
+        return cbat_string_append_length(out, buffer, length);
     }
     if (d != d || d == HUGE_VAL || d == -HUGE_VAL) {
         return CBAT_ERR_OUT_OF_RANGE;
     }
-    /* Shortest of %.15g..%.17g that reads back to the same double. */
-    for (precision = 15; precision <= 17; precision++) {
-        snprintf(buffer, sizeof(buffer), "%.*g", precision, d);
-        if (strtod(buffer, NULL) == d) {
-            break;
-        }
-    }
-    point = cbat__json_decimal_point();
-    for (i = 0; point != '.' && buffer[i] != '\0'; i++) {
-        if (buffer[i] == point) {
-            buffer[i] = '.';
-        }
-    }
-    return cbat_string_append(out, buffer);
+    return cbat_string_append_double(out, d);
 }
 
 static CBatError cbat__json_newline(CBatString *out, int indent, int depth) {

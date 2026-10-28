@@ -167,8 +167,31 @@ CBAT_API CBatError cbat_string_to_int64(const char *text, int64_t *out);
 /** Same, in `base` 2..36 (no prefixes such as 0x). */
 CBAT_API CBatError cbat_string_to_int64_base(const char *text, int base, int64_t *out);
 
-/** Parses a whole string as a double ("1.5", "-2e10", "inf", "nan"). */
+/**
+ * Parses an ASCII decimal double ("1.5", "-2e10", "inf", "nan"), regardless
+ * of LC_NUMERIC. Surrounding ASCII whitespace/sign allowed; commas, hex and
+ * trailing junk give ERR_PARSE. Overflow gives ERR_OVERFLOW; underflow rounds
+ * to a subnormal or signed zero. Output unchanged on failure (including OOM).
+ * Do not change the process locale concurrently with this call.
+ */
 CBAT_API CBatError cbat_string_to_double(const char *text, double *out);
+
+/** Decimal uint64, optional '+', ASCII whitespace; rejects '-'. Output unchanged on error. */
+CBAT_API CBatError cbat_string_to_uint64(const char *text, uint64_t *out);
+
+/**
+ * Shortest round-tripping decimal for binary64, choosing fixed/scientific
+ * notation by length (fixed on a tie). Uses '.', no redundant exponent zeros
+ * or '+'. Preserves -0; non-finite values are "inf", "-inf", "nan".
+ * Writes a NUL terminator and returns length (0 for NULL output).
+ */
+CBAT_API size_t cbat_format_double(double value, char out[32]);
+/** Appends cbat_format_double's locale-independent result; unchanged on OOM. */
+CBAT_API CBatError cbat_string_append_double(CBatString *s, double value);
+/** Decimal int64 including INT64_MIN. Writes NUL; length, or 0 for NULL output. */
+CBAT_API size_t cbat_format_int64(int64_t value, char out[21]);
+/** Decimal int64 with groups of three (separator 0 disables grouping). Atomic on OOM. */
+CBAT_API CBatError cbat_string_append_int64_grouped(CBatString *s, int64_t value, char separator);
 
 /* ---- UTF-8 -------------------------------------------------------------- */
 
