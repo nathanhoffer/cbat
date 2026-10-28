@@ -23,6 +23,9 @@ Versions use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Optional JSON comments/trailing commas and nesting limits, recursive sorted
+  output, atomic RFC 7396 merge patches, typed pointer lookups, CSV named
+  records and pointer-based option initialization.
 - Ordered INI settings with comments, quoted values, typed lookups, atomic
   updates, serialization, custom allocators, and a settings recipe.
 - Percent/form encoding, strict decoding, URI-reference parsing with IPv6

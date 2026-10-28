@@ -15,8 +15,74 @@
 
 #include "cbat/file.h"
 #include "cbat/fs.h"
+#include "cbat/dict.h"
 
 #define CBAT__CSV_NONE (-2)
+
+void cbat_csv_options_init(CBatCsvOptions *options) {
+    if (options != NULL) *options = cbat_csv_default_options();
+}
+
+static void cbat__csv_record_free(void *slot) { cbat_dict_free(*(CBatDict **)slot); }
+
+CBatError cbat_csv_parse_records(const char *text, size_t length,
+    const CBatCsvOptions *options, CBatList **out, CBatParseInfo *info) {
+    CBatList *rows = NULL, *records = NULL;
+    CBatDict *names = NULL;
+    CBatError err;
+    size_t row, column, width = 0;
+    if (out == NULL) return CBAT_ERR_INVALID_ARGUMENT;
+    err = cbat_csv_parse(text, length, options, &rows, info);
+    if (err != CBAT_OK) return err;
+    records = cbat_list_new(sizeof(CBatDict *));
+    names = cbat_dict_new(0);
+    if (records == NULL || names == NULL) { err = CBAT_ERR_NO_MEMORY; goto done; }
+    cbat_list_set_destructor(records, cbat__csv_record_free);
+    if (cbat_list_length(rows) != 0) {
+        CBatList *header = *(CBatList **)cbat_list_get(rows, 0);
+        width = cbat_list_length(header);
+        for (column = 0; column < width; column++) {
+            CBatString *name = *(CBatString **)cbat_list_get(header, column);
+            if (memchr(name->data, 0, name->length) != NULL || cbat_dict_contains(names, name->data)) {
+                err = CBAT_ERR_PARSE; goto done;
+            }
+            err = cbat_dict_set(names, name->data, NULL);
+            if (err != CBAT_OK) goto done;
+        }
+        for (row = 1; row < cbat_list_length(rows); row++) {
+            CBatList *fields = *(CBatList **)cbat_list_get(rows, row);
+            CBatDict *record;
+            if (cbat_list_length(fields) != width) { err = CBAT_ERR_PARSE; goto done; }
+            record = cbat_dict_new(sizeof(CBatString *));
+            if (record == NULL) { err = CBAT_ERR_NO_MEMORY; goto done; }
+            cbat_dict_set_destructor(record, cbat_string_destructor);
+            for (column = 0; column < width; column++) {
+                CBatString *name = *(CBatString **)cbat_list_get(header, column);
+                CBatString *field = *(CBatString **)cbat_list_get(fields, column);
+                CBatString *copy = cbat_string_from_length(field->data, field->length);
+                if (copy == NULL) { err = CBAT_ERR_NO_MEMORY; break; }
+                err = cbat_dict_set(record, name->data, &copy);
+                if (err != CBAT_OK) { cbat_string_free(copy); break; }
+            }
+            if (err == CBAT_OK) err = cbat_list_push(records, &record);
+            if (err != CBAT_OK) { cbat_dict_free(record); goto done; }
+        }
+    }
+done:
+    cbat_list_free(rows); cbat_dict_free(names);
+    if (err == CBAT_ERR_PARSE && info != NULL) {
+        info->line = 1; info->column = 1; info->offset = 0;
+        info->message = "duplicate/NUL header or record width differs from header";
+    }
+    if (err != CBAT_OK) { cbat_list_free(records); return err; }
+    *out = records;
+    return CBAT_OK;
+}
+
+CBatError cbat_csv_format_row(CBatString *out, const char *const *fields, size_t count,
+    const CBatCsvOptions *options) {
+    return cbat_csv_append_row(out, fields, count, options);
+}
 
 typedef struct cbat__csv_source {
     const char *text;   /* memory source, or NULL */

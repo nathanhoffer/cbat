@@ -635,6 +635,23 @@ CBAT_API CBatCsvOptions cbat_csv_default_options(void);
 The defaults: ',', '"', "\n".
 
 ```c
+CBAT_API void cbat_csv_options_init(CBatCsvOptions *options);
+```
+
+Writes defaults through a pointer (NULL ignored), suitable for VM callers.
+
+```c
+CBAT_API CBatError cbat_csv_parse_records(const char *text, size_t length, const CBatCsvOptions *options, CBatList **out, CBatParseInfo *info);
+```
+
+Parses records using the first row as column names. Returns an owned list
+of owned CBatDict objects containing owned CBatString pointers. Freeing the
+list frees everything. Every record must have the header's field count;
+duplicate or NUL-containing header names give PARSE. Empty names are allowed.
+Empty input returns an empty list. Output unchanged on error. Header/width
+errors report position 0 (line/column 1); syntax errors retain parser positions.
+
+```c
 CBAT_API CBatError cbat_csv_parse(const char *text, size_t length, const CBatCsvOptions *options, CBatList **rows, CBatParseInfo *info);
 ```
 
@@ -684,6 +701,12 @@ Appends one row to `out`, quoting fields that contain the delimiter, the
 quote character, a line break, or leading/trailing spaces.
 A single empty field is quoted so it round-trips as a record, not a blank
 line. NULL fields are treated as empty strings.
+
+```c
+CBAT_API CBatError cbat_csv_format_row(CBatString *out, const char *const *fields, size_t count, const CBatCsvOptions *options);
+```
+
+Alias for append_row: appends one formatted row including its line ending.
 
 ```c
 CBAT_API CBatError cbat_csv_append_row_list(CBatString *out, const CBatList *fields, const CBatCsvOptions *options);
@@ -1546,10 +1569,38 @@ typedef struct CBatJson CBatJson;
 ```
 
 ```c
+typedef struct CBatJsonParseOptions {
+    bool allow_comments;       /**< C-style block and // line comments. */
+    bool allow_trailing_commas;
+    size_t max_depth;
+} CBatJsonParseOptions;
+```
+
+Optional extensions; max_depth 0 uses CBAT_JSON_MAX_DEPTH, larger limits are rejected.
+
+```c
 CBAT_API CBatError cbat_json_parse(const char *text, size_t length, CBatJson **out, CBatParseInfo *info);
 ```
 
 Parses one JSON document (RFC 8259). `info` may be NULL.
+
+```c
+CBAT_API CBatError cbat_json_parse_with(const char *text, size_t length, const CBatJsonParseOptions *options, CBatJson **out, CBatParseInfo *info);
+```
+
+Parses with optional extensions (NULL = strict defaults). Output unchanged on error.
+
+```c
+CBAT_API CBatError cbat_json_to_string_sorted(const CBatJson *value, int indent, CBatString **out);
+```
+
+Serializes with object keys sorted recursively by unsigned UTF-8 bytes; source unchanged.
+
+```c
+CBAT_API CBatError cbat_json_merge_patch(CBatJson *target, const CBatJson *patch);
+```
+
+RFC 7396 merge patch in place; deep copies patch values. Atomic on OOM, including aliases.
 
 ```c
 CBAT_API CBatError cbat_json_parse_file(const char *path, CBatJson **out, CBatParseInfo *info);
@@ -1765,6 +1816,30 @@ CBAT_API CBatJson *cbat_json_pointer(const CBatJson *root, const char *pointer);
 Looks up a value by JSON Pointer (RFC 6901), e.g. "/users/0/name".
 "" is the root. "~1" means '/' and "~0" means '~' inside a key.
 Returns NULL if any step is missing.
+
+```c
+CBAT_API int64_t cbat_json_pointer_int(const CBatJson *root, const char *pointer, int64_t fallback);
+```
+
+Typed JSON Pointer lookups; missing/invalid pointer or wrong type returns fallback.
+
+```c
+CBAT_API double cbat_json_pointer_number(const CBatJson *root, const char *pointer, double fallback);
+```
+
+Same for numbers.
+
+```c
+CBAT_API const char *cbat_json_pointer_string(const CBatJson *root, const char *pointer, const char *fallback);
+```
+
+Borrowed string, or fallback.
+
+```c
+CBAT_API bool cbat_json_pointer_bool(const CBatJson *root, const char *pointer, bool fallback);
+```
+
+Same for booleans.
 
 
 ## list

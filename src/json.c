@@ -562,18 +562,140 @@ CBatJson *cbat_json_pointer(const CBatJson *root, const char *pointer) {
 
 /* ---- Parser ------------------------------------------------------------- */
 
+int64_t cbat_json_pointer_int(const CBatJson *root, const char *pointer, int64_t fallback) {
+    return cbat_json_as_int64(cbat_json_pointer(root, pointer), fallback);
+}
+double cbat_json_pointer_number(const CBatJson *root, const char *pointer, double fallback) {
+    return cbat_json_as_number(cbat_json_pointer(root, pointer), fallback);
+}
+const char *cbat_json_pointer_string(const CBatJson *root, const char *pointer, const char *fallback) {
+    return cbat_json_as_string(cbat_json_pointer(root, pointer), fallback);
+}
+bool cbat_json_pointer_bool(const CBatJson *root, const char *pointer, bool fallback) {
+    return cbat_json_as_bool(cbat_json_pointer(root, pointer), fallback);
+}
+
+static CBatError cbat__json_patch(CBatJson *target, const CBatJson *patch, size_t depth) {
+    size_t it = 0;
+    const char *key;
+    CBatJson *member;
+    if (depth > CBAT_JSON_MAX_DEPTH) return CBAT_ERR_OUT_OF_RANGE;
+    if (patch->type != CBAT_JSON_OBJECT) {
+        CBatJson *copy = cbat_json_copy(patch);
+        CBatJson old;
+        if (copy == NULL) return CBAT_ERR_NO_MEMORY;
+        old = *target; *target = *copy; *copy = old;
+        cbat_json_free(copy);
+        return CBAT_OK;
+    }
+    if (target->type != CBAT_JSON_OBJECT) {
+        CBatJson *empty = cbat_json_new_object();
+        CBatJson old;
+        if (empty == NULL) return CBAT_ERR_NO_MEMORY;
+        old = *target; *target = *empty; *empty = old; cbat_json_free(empty);
+    }
+    while (cbat_json_object_next(patch, &it, &key, &member)) {
+        CBatJson *existing = cbat_json_object_get(target, key);
+        CBatError err;
+        if (member->type == CBAT_JSON_NULL) {
+            if (existing != NULL) (void)cbat_json_object_remove(target, key);
+            continue;
+        }
+        if (existing != NULL) err = cbat__json_patch(existing, member, depth + 1);
+        else {
+            CBatJson *created = cbat_json_new_null();
+            if (created == NULL) return CBAT_ERR_NO_MEMORY;
+            err = cbat__json_patch(created, member, depth + 1);
+            if (err == CBAT_OK) err = cbat_json_object_set(target, key, created);
+            if (err != CBAT_OK) cbat_json_free(created);
+        }
+        if (err != CBAT_OK) return err;
+    }
+    return CBAT_OK;
+}
+
+CBatError cbat_json_merge_patch(CBatJson *target, const CBatJson *patch) {
+    CBatJson *copy;
+    CBatError err;
+    if (target == NULL || patch == NULL) return CBAT_ERR_INVALID_ARGUMENT;
+    copy = cbat_json_copy(target);
+    if (copy == NULL) return CBAT_ERR_NO_MEMORY;
+    err = cbat__json_patch(copy, patch, 0);
+    if (err == CBAT_OK) { CBatJson old = *target; *target = *copy; *copy = old; }
+    cbat_json_free(copy);
+    return err;
+}
+
+static int cbat__json_key_compare(const void *a, const void *b) {
+    return strcmp(*(const char *const *)a, *(const char *const *)b);
+}
+
+static CBatError cbat__json_sorted_copy(const CBatJson *value, size_t depth, CBatJson **out) {
+    CBatJson *result;
+    CBatError err = CBAT_OK;
+    size_t i, count = cbat_json_length(value);
+    if (depth > CBAT_JSON_MAX_DEPTH) return CBAT_ERR_OUT_OF_RANGE;
+    if (value->type != CBAT_JSON_ARRAY && value->type != CBAT_JSON_OBJECT) {
+        result = cbat_json_copy(value);
+        if (result == NULL) return CBAT_ERR_NO_MEMORY;
+    } else if (value->type == CBAT_JSON_ARRAY) {
+        result = cbat_json_new_array();
+        if (result == NULL) return CBAT_ERR_NO_MEMORY;
+        for (i = 0; i < count && err == CBAT_OK; i++) {
+            CBatJson *item = NULL;
+            err = cbat__json_sorted_copy(cbat_json_array_get(value, i), depth + 1, &item);
+            if (err == CBAT_OK) err = cbat_json_array_append(result, item);
+            if (err != CBAT_OK) cbat_json_free(item);
+        }
+    } else {
+        CBatList *keys = cbat_list_new(sizeof(const char *));
+        size_t it = 0;
+        const char *key;
+        result = cbat_json_new_object();
+        if (keys == NULL || result == NULL) { cbat_list_free(keys); cbat_json_free(result); return CBAT_ERR_NO_MEMORY; }
+        while (err == CBAT_OK && cbat_json_object_next(value, &it, &key, NULL)) err = cbat_list_push(keys, &key);
+        if (err == CBAT_OK && count > 1) qsort(keys->data, count, sizeof(const char *), cbat__json_key_compare);
+        for (i = 0; i < count && err == CBAT_OK; i++) {
+            CBatJson *item = NULL;
+            key = *(const char **)cbat_list_get(keys, i);
+            err = cbat__json_sorted_copy(cbat_json_object_get(value, key), depth + 1, &item);
+            if (err == CBAT_OK) err = cbat_json_object_set(result, key, item);
+            if (err != CBAT_OK) cbat_json_free(item);
+        }
+        cbat_list_free(keys);
+    }
+    if (err != CBAT_OK) { cbat_json_free(result); return err; }
+    *out = result;
+    return CBAT_OK;
+}
+
+CBatError cbat_json_to_string_sorted(const CBatJson *value, int indent, CBatString **out) {
+    CBatJson *copy = NULL;
+    CBatError err;
+    if (value == NULL || out == NULL || indent < 0) return CBAT_ERR_INVALID_ARGUMENT;
+    err = cbat__json_sorted_copy(value, 0, &copy);
+    if (err == CBAT_OK) err = cbat_json_to_string(copy, indent, out);
+    cbat_json_free(copy);
+    return err;
+}
+
 typedef struct cbat__json_parser {
     const char *text;
     size_t length;
     size_t position;
     int depth;
+    size_t max_depth;
+    bool allow_comments;
+    bool allow_trailing_commas;
     const char *message;
     size_t error_position;
 } cbat__json_parser;
 
 static CBatError cbat__json_fail(cbat__json_parser *p, const char *message) {
-    p->message = message;
-    p->error_position = p->position;
+    if (p->message == NULL) {
+        p->message = message;
+        p->error_position = p->position;
+    }
     return CBAT_ERR_PARSE;
 }
 
@@ -581,6 +703,28 @@ static void cbat__json_skip_space(cbat__json_parser *p) {
     while (p->position < p->length) {
         char c = p->text[p->position];
         if (c != ' ' && c != '\t' && c != '\n' && c != '\r') {
+            if (p->allow_comments && c == '/' && p->length - p->position >= 2) {
+                char next = p->text[p->position + 1];
+                if (next == '/') {
+                    p->position += 2;
+                    while (p->position < p->length && p->text[p->position] != '\n' && p->text[p->position] != '\r') p->position++;
+                    continue;
+                }
+                if (next == '*') {
+                    size_t start = p->position;
+                    p->position += 2;
+                    while (p->length - p->position >= 2 &&
+                           !(p->text[p->position] == '*' && p->text[p->position + 1] == '/')) p->position++;
+                    if (p->length - p->position < 2) {
+                        p->position = start;
+                        (void)cbat__json_fail(p, "unterminated block comment");
+                        p->position = p->length;
+                        return;
+                    }
+                    p->position += 2;
+                    continue;
+                }
+            }
             break;
         }
         p->position++;
@@ -815,6 +959,10 @@ static CBatError cbat__json_parse_array(cbat__json_parser *p, CBatJson **out) {
         cbat__json_skip_space(p);
         if (cbat__json_peek(p) == ',') {
             p->position++;
+            cbat__json_skip_space(p);
+            if (p->allow_trailing_commas && cbat__json_peek(p) == ']') {
+                p->position++; *out = array; return CBAT_OK;
+            }
             continue;
         }
         if (cbat__json_peek(p) == ']') {
@@ -882,6 +1030,10 @@ static CBatError cbat__json_parse_object(cbat__json_parser *p, CBatJson **out) {
         cbat__json_skip_space(p);
         if (cbat__json_peek(p) == ',') {
             p->position++;
+            cbat__json_skip_space(p);
+            if (p->allow_trailing_commas && cbat__json_peek(p) == '}') {
+                p->position++; break;
+            }
             continue;
         }
         if (cbat__json_peek(p) == '}') {
@@ -916,7 +1068,7 @@ static CBatError cbat__json_parse_value(cbat__json_parser *p, CBatJson **out) {
     switch (c) {
     case '{':
     case '[':
-        if (++p->depth > CBAT_JSON_MAX_DEPTH) {
+        if ((size_t)++p->depth > p->max_depth) {
             return cbat__json_fail(p, "nesting is too deep");
         }
         err = c == '{' ? cbat__json_parse_object(p, out) : cbat__json_parse_array(p, out);
@@ -989,17 +1141,22 @@ static void cbat__json_fill_info(const cbat__json_parser *p, CBatParseInfo *info
     info->message = p->message;
 }
 
-CBatError cbat_json_parse(const char *text, size_t length, CBatJson **out, CBatParseInfo *info) {
+CBatError cbat_json_parse_with(const char *text, size_t length,
+    const CBatJsonParseOptions *options, CBatJson **out, CBatParseInfo *info) {
     cbat__json_parser p;
     CBatJson *value = NULL;
     CBatError err;
     if ((text == NULL && length > 0) || out == NULL) {
         return CBAT_ERR_INVALID_ARGUMENT;
     }
+    if (options != NULL && options->max_depth > CBAT_JSON_MAX_DEPTH) return CBAT_ERR_INVALID_ARGUMENT;
     p.text = text;
     p.length = length;
     p.position = 0;
     p.depth = 0;
+    p.max_depth = options != NULL && options->max_depth != 0 ? options->max_depth : CBAT_JSON_MAX_DEPTH;
+    p.allow_comments = options != NULL && options->allow_comments;
+    p.allow_trailing_commas = options != NULL && options->allow_trailing_commas;
     p.message = NULL;
     p.error_position = 0;
     /* Tolerate a UTF-8 byte-order mark. */
@@ -1010,9 +1167,9 @@ CBatError cbat_json_parse(const char *text, size_t length, CBatJson **out, CBatP
     err = cbat__json_parse_value(&p, &value);
     if (err == CBAT_OK) {
         cbat__json_skip_space(&p);
-        if (p.position < p.length) {
+        if (p.message != NULL || p.position < p.length) {
             cbat_json_free(value);
-            err = cbat__json_fail(&p, "unexpected text after the JSON value");
+            err = p.message != NULL ? CBAT_ERR_PARSE : cbat__json_fail(&p, "unexpected text after the JSON value");
         }
     }
     if (err == CBAT_ERR_PARSE) {
@@ -1023,6 +1180,10 @@ CBatError cbat_json_parse(const char *text, size_t length, CBatJson **out, CBatP
     }
     *out = value;
     return CBAT_OK;
+}
+
+CBatError cbat_json_parse(const char *text, size_t length, CBatJson **out, CBatParseInfo *info) {
+    return cbat_json_parse_with(text, length, NULL, out, info);
 }
 
 CBatError cbat_json_parse_file(const char *path, CBatJson **out, CBatParseInfo *info) {

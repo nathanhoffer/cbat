@@ -44,11 +44,28 @@ typedef struct CBatJson CBatJson;
 /** Maximum nesting depth accepted by the parser. */
 #define CBAT_JSON_MAX_DEPTH 512
 
+/** Optional extensions; max_depth 0 uses CBAT_JSON_MAX_DEPTH, larger limits are rejected. */
+typedef struct CBatJsonParseOptions {
+    bool allow_comments;       /**< C-style block and // line comments. */
+    bool allow_trailing_commas;
+    size_t max_depth;
+} CBatJsonParseOptions;
+
 /* ---- Parsing and printing ----------------------------------------------- */
 
 /** Parses one JSON document (RFC 8259). `info` may be NULL. */
 CBAT_API CBatError cbat_json_parse(const char *text, size_t length, CBatJson **out,
                                    CBatParseInfo *info);
+
+/** Parses with optional extensions (NULL = strict defaults). Output unchanged on error. */
+CBAT_API CBatError cbat_json_parse_with(const char *text, size_t length,
+    const CBatJsonParseOptions *options, CBatJson **out, CBatParseInfo *info);
+
+/** Serializes with object keys sorted recursively by unsigned UTF-8 bytes; source unchanged. */
+CBAT_API CBatError cbat_json_to_string_sorted(const CBatJson *value, int indent, CBatString **out);
+
+/** RFC 7396 merge patch in place; deep copies patch values. Atomic on OOM, including aliases. */
+CBAT_API CBatError cbat_json_merge_patch(CBatJson *target, const CBatJson *patch);
 
 /** Reads and parses a JSON file. */
 CBAT_API CBatError cbat_json_parse_file(const char *path, CBatJson **out, CBatParseInfo *info);
@@ -156,6 +173,15 @@ CBAT_API CBatError cbat_json_object_set_string(CBatJson *object, const char *key
  * Returns NULL if any step is missing.
  */
 CBAT_API CBatJson *cbat_json_pointer(const CBatJson *root, const char *pointer);
+
+/** Typed JSON Pointer lookups; missing/invalid pointer or wrong type returns fallback. */
+CBAT_API int64_t cbat_json_pointer_int(const CBatJson *root, const char *pointer, int64_t fallback);
+/** Same for numbers. */
+CBAT_API double cbat_json_pointer_number(const CBatJson *root, const char *pointer, double fallback);
+/** Borrowed string, or fallback. */
+CBAT_API const char *cbat_json_pointer_string(const CBatJson *root, const char *pointer, const char *fallback);
+/** Same for booleans. */
+CBAT_API bool cbat_json_pointer_bool(const CBatJson *root, const char *pointer, bool fallback);
 
 CBAT_END_DECLS
 

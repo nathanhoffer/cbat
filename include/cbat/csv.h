@@ -35,6 +35,20 @@ typedef struct CBatCsvOptions {
 /** The defaults: ',', '"', "\n". */
 CBAT_API CBatCsvOptions cbat_csv_default_options(void);
 
+/** Writes defaults through a pointer (NULL ignored), suitable for VM callers. */
+CBAT_API void cbat_csv_options_init(CBatCsvOptions *options);
+
+/**
+ * Parses records using the first row as column names. Returns an owned list
+ * of owned CBatDict objects containing owned CBatString pointers. Freeing the
+ * list frees everything. Every record must have the header's field count;
+ * duplicate or NUL-containing header names give PARSE. Empty names are allowed.
+ * Empty input returns an empty list. Output unchanged on error. Header/width
+ * errors report position 0 (line/column 1); syntax errors retain parser positions.
+ */
+CBAT_API CBatError cbat_csv_parse_records(const char *text, size_t length,
+    const CBatCsvOptions *options, CBatList **out, CBatParseInfo *info);
+
 /**
  * Parses all of `text`. *rows receives a list of `CBatList *` rows, each a
  * list of `CBatString *` fields; freeing *rows frees everything.
@@ -77,6 +91,10 @@ CBAT_API void cbat_csv_reader_close(CBatCsvReader *reader);
  */
 CBAT_API CBatError cbat_csv_append_row(CBatString *out, const char *const *fields, size_t count,
                                        const CBatCsvOptions *options);
+
+/** Alias for append_row: appends one formatted row including its line ending. */
+CBAT_API CBatError cbat_csv_format_row(CBatString *out, const char *const *fields, size_t count,
+                                      const CBatCsvOptions *options);
 
 /** Same, for a list of `CBatString *`. */
 CBAT_API CBatError cbat_csv_append_row_list(CBatString *out, const CBatList *fields,

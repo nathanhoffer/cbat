@@ -121,7 +121,7 @@ if(CBAT_BUILD_TESTS OR CBAT_BUILD_COOKBOOK)
 endif()
 
 if(CBAT_BUILD_TESTS)
-    foreach(module IN LISTS CBAT_MODULES)
+    foreach(module IN LISTS CBAT_MODULES ITEMS format_extras)
         set(test_source "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_${module}.c")
         if(EXISTS "${test_source}")
             add_executable(test_${module} "${test_source}")
