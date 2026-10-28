@@ -23,6 +23,9 @@ Versions use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Bounded splitting, line splitting, partition, ASCII predicates, natural
+  ordering, padding, prefix/suffix removal, byte-set stripping, and validated
+  UTF-8 reversal/code-point slicing. UTF-8 fuzzing checks reverse/slice invariants.
 - Locale-independent double/int64 formatting, uint64 parsing, and grouped
   int64 output, with exact binary64 round-trip coverage.
 - Dictionary Counter helpers (`increment`, stable `most_common`),

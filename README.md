@@ -14,8 +14,10 @@ tested C99 library with one consistent style.
 int main(void) {
     CBatList *words = NULL;
     CBatDict *counts = cbat_dict_new(sizeof(int));
+    /* Split the text into words using whitespace. */
     cbat_string_split_whitespace("the cat saw the other cat", &words);
 
+    /* Visit each word produced above; FOREACH does not split text. */
     CBAT_LIST_FOREACH(CBatString *, w, words) {
         const char *word = cbat_string_cstr(*w);
         CBAT_DICT_SET(counts, word, int, CBAT_DICT_GET(counts, word, int, 0) + 1);

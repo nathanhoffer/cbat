@@ -2510,6 +2510,42 @@ CBAT_API void cbat_string_trim_right(CBatString *s);
 ```
 
 ```c
+CBAT_API CBatError cbat_string_pad_left(CBatString *s, size_t width, char fill);
+```
+
+Byte-width padding; unchanged when width <= length. Atomic on OOM/overflow.
+
+```c
+CBAT_API CBatError cbat_string_pad_right(CBatString *s, size_t width, char fill);
+```
+
+Same, adding bytes on the right. fill may be NUL (length remains explicit).
+
+```c
+CBAT_API CBatError cbat_string_center(CBatString *s, size_t width, char fill);
+```
+
+Centers by byte width; odd extra padding goes on the right. Atomic on error.
+
+```c
+CBAT_API void cbat_string_strip_chars(CBatString *s, const char *characters);
+```
+
+Removes bytes in the C string characters from both ends; NULL arguments are ignored.
+
+```c
+CBAT_API CBatError cbat_string_remove_prefix(CBatString *s, const char *prefix);
+```
+
+Removes a matching prefix (otherwise no-op); NULL arguments are invalid.
+
+```c
+CBAT_API CBatError cbat_string_remove_suffix(CBatString *s, const char *suffix);
+```
+
+Removes a matching suffix (otherwise no-op); NULL arguments are invalid.
+
+```c
 CBAT_API size_t cbat_string_find(const CBatString *s, const char *needle, size_t start);
 ```
 
@@ -2546,6 +2582,38 @@ CBAT_API bool cbat_string_equals(const CBatString *s, const char *text);
 Byte-wise equality with a C string.
 
 ```c
+CBAT_API bool cbat_string_equals_ignore_case(const CBatString *s, const char *text);
+```
+
+ASCII case-insensitive, length-aware equality; NULL arguments give false.
+
+```c
+CBAT_API bool cbat_string_starts_with_ignore_case(const CBatString *s, const char *prefix);
+```
+
+ASCII case-insensitive prefix check; NULL arguments give false.
+
+```c
+CBAT_API bool cbat_string_is_ascii_digits(const char *text);
+```
+
+Nonempty C string of ASCII digits only (false for NULL).
+
+```c
+CBAT_API int cbat_compare_natural(const char *a, const char *b);
+```
+
+Natural ordering: file9 < file10. Digit runs compare by magnitude, without
+integer overflow; numeric ties prefer shorter digit runs. Other bytes
+compare unsigned, case-sensitively. NULL sorts before non-NULL.
+
+```c
+CBAT_API int cbat_compare_natural_elements(const void *a, const void *b);
+```
+
+CBatCompare for element slots holding const char * (NULL slots sort first).
+
+```c
 CBAT_API int cbat_string_compare(const CBatString *a, const CBatString *b);
 ```
 
@@ -2578,10 +2646,34 @@ str.split(sep): "a,,b" gives ["a", "", "b"]. *out receives a new list of
 `CBatString *` that owns its strings: free it with cbat_list_free().
 
 ```c
+CBAT_API CBatError cbat_string_split_max(const char *text, const char *separator, size_t max_splits, CBatList **out);
+```
+
+Same with at most max_splits; 0 returns the entire text as one field.
+
+```c
+CBAT_API CBatError cbat_string_split_lines(const char *text, CBatList **out);
+```
+
+Splits on LF, CRLF or CR, excluding a trailing empty line; empty input gives no lines.
+
+```c
+CBAT_API CBatError cbat_string_partition(const char *text, const char *separator, CBatString **before, CBatString **after);
+```
+
+Splits at the first nonempty separator, returning two owned strings.
+NOT_FOUND leaves outputs unchanged. NULL arguments/aliased output slots
+give INVALID_ARGUMENT. Free each result with cbat_string_free.
+
+```c
 CBAT_API CBatError cbat_string_split_whitespace(const char *text, CBatList **out);
 ```
 
-Splits on runs of ASCII whitespace, dropping empty pieces (str.split()).
+Splits on runs of ASCII whitespace: space, tab (\t), newline (\n), carriage
+return (\r), vertical tab (\v), and form feed (\f). Leading/trailing and
+repeated whitespace produce no empty fields. "  the\tcat  " gives
+["the", "cat"]. Does not treat non-ASCII spaces as separators.
+out receives an owned list of owned CBatString pointers; free the list.
 
 ```c
 CBAT_API CBatError cbat_string_join(const CBatList *strings, const char *separator, CBatString **out);
@@ -2668,6 +2760,20 @@ CBAT_API CBatError cbat_utf8_count(const char *text, size_t length, size_t *coun
 ```
 
 Number of code points (CBAT_ERR_INVALID_UTF8 on bad input).
+
+```c
+CBAT_API CBatError cbat_utf8_reverse(const char *text, CBatString **out);
+```
+
+Reverse UTF-8 code points (not grapheme clusters) into a new owned string.
+Invalid UTF-8 gives ERR_INVALID_UTF8; outputs unchanged on error.
+
+```c
+CBAT_API CBatError cbat_utf8_substring(const char *text, size_t start, size_t count, CBatString **out);
+```
+
+Code-point slice, start/count clamped to length. Validates the entire C string.
+New owned string; invalid UTF-8/errors leave output unchanged.
 
 
 ## test

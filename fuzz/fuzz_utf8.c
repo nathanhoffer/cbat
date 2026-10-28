@@ -19,6 +19,19 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
             actual_count++;
         }
         CBAT_FUZZ_CHECK(count == actual_count);
+        if (memchr(data, 0, size) == NULL && size != SIZE_MAX) {
+            char *text = (char *)malloc(size + 1);
+            if (text != NULL) {
+                CBatString *reversed = NULL, *twice = NULL, *slice = NULL;
+                memcpy(text, data, size); text[size] = '\0';
+                CBAT_FUZZ_CHECK(cbat_utf8_reverse(text, &reversed) == CBAT_OK);
+                CBAT_FUZZ_CHECK(cbat_utf8_reverse(reversed->data, &twice) == CBAT_OK);
+                CBAT_FUZZ_CHECK(twice->length == size && memcmp(twice->data, data, size) == 0);
+                CBAT_FUZZ_CHECK(cbat_utf8_substring(text, 0, SIZE_MAX, &slice) == CBAT_OK);
+                CBAT_FUZZ_CHECK(slice->length == size && memcmp(slice->data, data, size) == 0);
+                cbat_string_free(slice); cbat_string_free(twice); cbat_string_free(reversed); free(text);
+            }
+        }
     }
     return 0;
 }

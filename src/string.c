@@ -460,6 +460,51 @@ void cbat_string_trim(CBatString *s) {
     cbat_string_trim_left(s);
 }
 
+static CBatError cbat__string_pad(CBatString *s, size_t width, char fill, int side) {
+    size_t left, padding, original;
+    CBatError err;
+    if (s == NULL) return CBAT_ERR_INVALID_ARGUMENT;
+    if (width <= s->length) return CBAT_OK;
+    original = s->length;
+    padding = width - original;
+    left = side < 0 ? padding : side > 0 ? 0 : padding / 2;
+    err = cbat__string_ensure(s, width);
+    if (err != CBAT_OK) return err;
+    memmove(s->data + left, s->data, original);
+    memset(s->data, (unsigned char)fill, left);
+    memset(s->data + left + original, (unsigned char)fill, padding - left);
+    s->length = width;
+    s->data[width] = '\0';
+    return CBAT_OK;
+}
+
+CBatError cbat_string_pad_left(CBatString *s, size_t width, char fill) { return cbat__string_pad(s, width, fill, -1); }
+CBatError cbat_string_pad_right(CBatString *s, size_t width, char fill) { return cbat__string_pad(s, width, fill, 1); }
+CBatError cbat_string_center(CBatString *s, size_t width, char fill) { return cbat__string_pad(s, width, fill, 0); }
+
+void cbat_string_strip_chars(CBatString *s, const char *characters) {
+    size_t left = 0, right;
+    if (s == NULL || characters == NULL) return;
+    right = s->length;
+    while (left < right && s->data[left] != '\0' && strchr(characters, s->data[left]) != NULL) left++;
+    while (right > left && s->data[right - 1] != '\0' && strchr(characters, s->data[right - 1]) != NULL) right--;
+    /* Compute bounds before modifying anything: characters may alias s. */
+    memmove(s->data, s->data + left, right - left);
+    s->length = right - left;
+    s->data[s->length] = '\0';
+}
+
+CBatError cbat_string_remove_prefix(CBatString *s, const char *prefix) {
+    if (s == NULL || prefix == NULL) return CBAT_ERR_INVALID_ARGUMENT;
+    return cbat_string_starts_with(s, prefix) ? cbat_string_erase(s, 0, strlen(prefix)) : CBAT_OK;
+}
+
+CBatError cbat_string_remove_suffix(CBatString *s, const char *suffix) {
+    if (s == NULL || suffix == NULL) return CBAT_ERR_INVALID_ARGUMENT;
+    if (cbat_string_ends_with(s, suffix)) cbat_string_truncate(s, s->length - strlen(suffix));
+    return CBAT_OK;
+}
+
 /* ---- Searching and comparing -------------------------------------------- */
 
 size_t cbat_string_find(const CBatString *s, const char *needle, size_t start) {
@@ -535,6 +580,63 @@ bool cbat_string_equals(const CBatString *s, const char *text) {
     }
     length = strlen(text);
     return length == s->length && memcmp(s->data, text, length) == 0;
+}
+
+static unsigned char cbat__string_ascii_lower(unsigned char c) {
+    return c >= 'A' && c <= 'Z' ? (unsigned char)(c + ('a' - 'A')) : c;
+}
+
+bool cbat_string_starts_with_ignore_case(const CBatString *s, const char *prefix) {
+    size_t i = 0;
+    if (s == NULL || prefix == NULL) return false;
+    while (prefix[i] != '\0') {
+        if (i == s->length || cbat__string_ascii_lower((unsigned char)s->data[i]) !=
+            cbat__string_ascii_lower((unsigned char)prefix[i])) return false;
+        i++;
+    }
+    return true;
+}
+
+bool cbat_string_equals_ignore_case(const CBatString *s, const char *text) {
+    return s != NULL && text != NULL && strlen(text) == s->length &&
+        cbat_string_starts_with_ignore_case(s, text);
+}
+
+bool cbat_string_is_ascii_digits(const char *text) {
+    if (text == NULL || *text == '\0') return false;
+    while (*text != '\0') { if (*text < '0' || *text > '9') return false; text++; }
+    return true;
+}
+
+int cbat_compare_natural(const char *a, const char *b) {
+    if (a == NULL || b == NULL) return (a != NULL) - (b != NULL);
+    while (*a != '\0' && *b != '\0') {
+        if (*a >= '0' && *a <= '9' && *b >= '0' && *b <= '9') {
+            const char *a_start = a, *b_start = b, *a_digits, *b_digits;
+            size_t a_length, b_length, a_run, b_run;
+            int order;
+            while (*a == '0') a++;
+            while (*b == '0') b++;
+            a_digits = a; b_digits = b;
+            while (*a >= '0' && *a <= '9') a++;
+            while (*b >= '0' && *b <= '9') b++;
+            a_length = (size_t)(a - a_digits); b_length = (size_t)(b - b_digits);
+            if (a_length != b_length) return a_length < b_length ? -1 : 1;
+            order = memcmp(a_digits, b_digits, a_length);
+            if (order != 0) return order < 0 ? -1 : 1;
+            a_run = (size_t)(a - a_start); b_run = (size_t)(b - b_start);
+            if (a_run != b_run) return a_run < b_run ? -1 : 1;
+        } else {
+            unsigned char x = (unsigned char)*a++, y = (unsigned char)*b++;
+            if (x != y) return x < y ? -1 : 1;
+        }
+    }
+    return (*a != '\0') - (*b != '\0');
+}
+
+int cbat_compare_natural_elements(const void *a, const void *b) {
+    return cbat_compare_natural(a == NULL ? NULL : *(const char *const *)a,
+                               b == NULL ? NULL : *(const char *const *)b);
 }
 
 int cbat_string_compare(const CBatString *a, const CBatString *b) {
@@ -614,11 +716,12 @@ static CBatError cbat__string_list_push(CBatList *list, const char *text, size_t
     return err;
 }
 
-CBatError cbat_string_split(const char *text, const char *separator, CBatList **out) {
+CBatError cbat_string_split_max(const char *text, const char *separator, size_t max_splits, CBatList **out) {
     CBatList *list;
     size_t text_length;
     size_t separator_length;
     size_t position = 0;
+    size_t splits = 0;
     CBatError err;
     if (text == NULL || separator == NULL || separator[0] == '\0' || out == NULL) {
         return CBAT_ERR_INVALID_ARGUMENT;
@@ -630,7 +733,8 @@ CBatError cbat_string_split(const char *text, const char *separator, CBatList **
     text_length = strlen(text);
     separator_length = strlen(separator);
     for (;;) {
-        size_t hit = cbat__string_search(text, text_length, separator, separator_length, position);
+        size_t hit = splits < max_splits ?
+            cbat__string_search(text, text_length, separator, separator_length, position) : CBAT_NPOS;
         size_t end = hit == CBAT_NPOS ? text_length : hit;
         err = cbat__string_list_push(list, text + position, end - position);
         if (err != CBAT_OK) {
@@ -641,8 +745,47 @@ CBatError cbat_string_split(const char *text, const char *separator, CBatList **
             break;
         }
         position = hit + separator_length;
+        splits++;
     }
     *out = list;
+    return CBAT_OK;
+}
+
+CBatError cbat_string_split(const char *text, const char *separator, CBatList **out) {
+    return cbat_string_split_max(text, separator, SIZE_MAX, out);
+}
+
+CBatError cbat_string_split_lines(const char *text, CBatList **out) {
+    CBatList *list;
+    size_t position = 0;
+    if (text == NULL || out == NULL) return CBAT_ERR_INVALID_ARGUMENT;
+    list = cbat__string_list_new();
+    if (list == NULL) return CBAT_ERR_NO_MEMORY;
+    while (text[position] != '\0') {
+        size_t start = position;
+        CBatError err;
+        while (text[position] != '\0' && text[position] != '\n' && text[position] != '\r') position++;
+        err = cbat__string_list_push(list, text + start, position - start);
+        if (err != CBAT_OK) { cbat_list_free(list); return err; }
+        if (text[position] == '\r') { position++; if (text[position] == '\n') position++; }
+        else if (text[position] == '\n') position++;
+    }
+    *out = list;
+    return CBAT_OK;
+}
+
+CBatError cbat_string_partition(const char *text, const char *separator, CBatString **before, CBatString **after) {
+    const char *hit;
+    CBatString *left, *right;
+    if (text == NULL || separator == NULL || separator[0] == '\0' ||
+        before == NULL || after == NULL || before == after) return CBAT_ERR_INVALID_ARGUMENT;
+    hit = strstr(text, separator);
+    if (hit == NULL) return CBAT_ERR_NOT_FOUND;
+    left = cbat_string_from_length(text, (size_t)(hit - text));
+    if (left == NULL) return CBAT_ERR_NO_MEMORY;
+    right = cbat_string_from(hit + strlen(separator));
+    if (right == NULL) { cbat_string_free(left); return CBAT_ERR_NO_MEMORY; }
+    *before = left; *after = right;
     return CBAT_OK;
 }
 
@@ -1102,4 +1245,46 @@ CBatError cbat_utf8_count(const char *text, size_t length, size_t *count) {
 bool cbat_utf8_is_valid(const char *text, size_t length) {
     size_t count;
     return cbat_utf8_count(text, length, &count) == CBAT_OK;
+}
+
+CBatError cbat_utf8_reverse(const char *text, CBatString **out) {
+    CBatString *result;
+    size_t length, position = 0, count;
+    CBatError err;
+    if (text == NULL || out == NULL) return CBAT_ERR_INVALID_ARGUMENT;
+    length = strlen(text);
+    err = cbat_utf8_count(text, length, &count);
+    if (err != CBAT_OK) return err;
+    result = cbat_string_new();
+    if (result == NULL) return CBAT_ERR_NO_MEMORY;
+    err = cbat_string_reserve(result, length);
+    if (err != CBAT_OK) { cbat_string_free(result); return err; }
+    while (position < length) {
+        size_t used = cbat_utf8_decode(text + position, length - position, NULL);
+        memcpy(result->data + length - position - used, text + position, used);
+        position += used;
+    }
+    result->length = length;
+    result->data[length] = '\0';
+    *out = result;
+    return CBAT_OK;
+}
+
+CBatError cbat_utf8_substring(const char *text, size_t start, size_t count, CBatString **out) {
+    size_t total, length, position = 0, begin, i;
+    CBatString *result;
+    CBatError err;
+    if (text == NULL || out == NULL) return CBAT_ERR_INVALID_ARGUMENT;
+    length = strlen(text);
+    err = cbat_utf8_count(text, length, &total);
+    if (err != CBAT_OK) return err;
+    start = CBAT_MIN(start, total);
+    count = CBAT_MIN(count, total - start);
+    for (i = 0; i < start; i++) position += cbat_utf8_decode(text + position, length - position, NULL);
+    begin = position;
+    for (i = 0; i < count; i++) position += cbat_utf8_decode(text + position, length - position, NULL);
+    result = cbat_string_from_length(text + begin, position - begin);
+    if (result == NULL) return CBAT_ERR_NO_MEMORY;
+    *out = result;
+    return CBAT_OK;
 }

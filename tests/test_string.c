@@ -6,6 +6,7 @@
 #include "cbat/string.h"
 #include "cbat/test.h"
 #include "cbat/random.h"
+#include "cbat/sort.h"
 
 CBAT_TEST(test_new_from_and_free) {
     CBatString *a = cbat_string_new();
@@ -516,6 +517,196 @@ CBAT_TEST(test_numeric_locale_and_allocation_errors) {
     cbat_free(saved); cbat_string_free(large); cbat_string_free(output);
 }
 
+CBAT_TEST(test_padding_stripping_and_prefix_suffix) {
+    CBatString *s = cbat_string_from("abc");
+    CBAT_REQUIRE_NOT_NULL(s);
+    CBAT_REQUIRE_OK(cbat_string_pad_left(s, 6, '.')); CBAT_CHECK_EQ_STR(s->data, "...abc");
+    CBAT_REQUIRE_OK(cbat_string_pad_right(s, 8, '!')); CBAT_CHECK_EQ_STR(s->data, "...abc!!");
+    CBAT_REQUIRE_OK(cbat_string_set(s, "abc"));
+    CBAT_REQUIRE_OK(cbat_string_center(s, 6, '-')); CBAT_CHECK_EQ_STR(s->data, "-abc--");
+    CBAT_REQUIRE_OK(cbat_string_center(s, 2, '-')); CBAT_CHECK_EQ_STR(s->data, "-abc--");
+    cbat_string_strip_chars(s, "-"); CBAT_CHECK_EQ_STR(s->data, "abc");
+    cbat_string_strip_chars(s, ""); CBAT_CHECK_EQ_STR(s->data, "abc");
+    cbat_string_strip_chars(s, s->data + 1); CBAT_CHECK_EQ_STR(s->data, "a");
+    cbat_string_strip_chars(s, "a"); CBAT_CHECK_EQ_STR(s->data, "");
+    CBAT_REQUIRE_OK(cbat_string_set(s, "prefix-name.txt"));
+    CBAT_REQUIRE_OK(cbat_string_remove_prefix(s, "prefix-")); CBAT_CHECK_EQ_STR(s->data, "name.txt");
+    CBAT_REQUIRE_OK(cbat_string_remove_suffix(s, ".txt")); CBAT_CHECK_EQ_STR(s->data, "name");
+    CBAT_REQUIRE_OK(cbat_string_remove_prefix(s, "missing"));
+    CBAT_REQUIRE_OK(cbat_string_remove_suffix(s, "missing")); CBAT_CHECK_EQ_STR(s->data, "name");
+    CBAT_REQUIRE_OK(cbat_string_remove_suffix(s, s->data + 1)); CBAT_CHECK_EQ_STR(s->data, "n");
+    CBAT_REQUIRE_OK(cbat_string_remove_prefix(s, ""));
+    CBAT_REQUIRE_OK(cbat_string_pad_right(s, 3, '\0'));
+    CBAT_CHECK_EQ_SIZE(s->length, 3); CBAT_CHECK_EQ_MEM(s->data, "n\0\0", 3);
+    CBAT_CHECK_ERR(cbat_string_pad_left(s, SIZE_MAX, '.'), CBAT_ERR_OVERFLOW);
+    CBAT_CHECK_EQ_SIZE(s->length, 3);
+    CBAT_CHECK_ERR(cbat_string_pad_left(NULL, 1, '.'), CBAT_ERR_INVALID_ARGUMENT);
+    CBAT_CHECK_ERR(cbat_string_pad_right(NULL, 1, '.'), CBAT_ERR_INVALID_ARGUMENT);
+    CBAT_CHECK_ERR(cbat_string_center(NULL, 1, '.'), CBAT_ERR_INVALID_ARGUMENT);
+    CBAT_CHECK_ERR(cbat_string_remove_prefix(NULL, "x"), CBAT_ERR_INVALID_ARGUMENT);
+    CBAT_CHECK_ERR(cbat_string_remove_prefix(s, NULL), CBAT_ERR_INVALID_ARGUMENT);
+    CBAT_CHECK_ERR(cbat_string_remove_suffix(NULL, "x"), CBAT_ERR_INVALID_ARGUMENT);
+    CBAT_CHECK_ERR(cbat_string_remove_suffix(s, NULL), CBAT_ERR_INVALID_ARGUMENT);
+    cbat_string_strip_chars(NULL, "x"); cbat_string_strip_chars(s, NULL);
+    cbat_string_free(s);
+}
+
+CBAT_TEST(test_ascii_predicates_and_natural_order) {
+    CBatString *s = cbat_string_from("Hello");
+    const char *names[] = {"file10", "file2", "file01", "file1", "file0"};
+    const char *a = "file2", *b = "file10";
+    CBAT_REQUIRE_NOT_NULL(s);
+    CBAT_CHECK(cbat_string_equals_ignore_case(s, "hELLo"));
+    CBAT_CHECK(!cbat_string_equals_ignore_case(s, "hello!"));
+    CBAT_CHECK(cbat_string_starts_with_ignore_case(s, "HE"));
+    CBAT_CHECK(cbat_string_starts_with_ignore_case(s, ""));
+    CBAT_CHECK(!cbat_string_starts_with_ignore_case(s, "HELLO!"));
+    CBAT_CHECK(!cbat_string_starts_with_ignore_case(NULL, "x"));
+    CBAT_CHECK(!cbat_string_starts_with_ignore_case(s, NULL));
+    CBAT_CHECK(!cbat_string_equals_ignore_case(NULL, "x"));
+    CBAT_CHECK(!cbat_string_equals_ignore_case(s, NULL));
+    CBAT_CHECK(cbat_string_is_ascii_digits("00123456789"));
+    CBAT_CHECK(!cbat_string_is_ascii_digits(""));
+    CBAT_CHECK(!cbat_string_is_ascii_digits(NULL));
+    CBAT_CHECK(!cbat_string_is_ascii_digits("12 3"));
+    CBAT_CHECK(!cbat_string_is_ascii_digits("-1"));
+    CBAT_CHECK(!cbat_string_is_ascii_digits("\xD9\xA1"));
+    CBAT_REQUIRE_OK(cbat_sort((void *)names, CBAT_ARRAY_LEN(names), sizeof(names[0]), cbat_compare_natural_elements));
+    CBAT_CHECK_EQ_STR(names[0], "file0"); CBAT_CHECK_EQ_STR(names[1], "file1");
+    CBAT_CHECK_EQ_STR(names[2], "file01"); CBAT_CHECK_EQ_STR(names[3], "file2");
+    CBAT_CHECK_EQ_STR(names[4], "file10");
+    CBAT_CHECK(cbat_compare_natural("99999999999999999999", "100000000000000000000") < 0);
+    CBAT_CHECK(cbat_compare_natural("a", "b") < 0);
+    CBAT_CHECK(cbat_compare_natural("a", "aa") < 0);
+    CBAT_CHECK_EQ_INT(cbat_compare_natural("same9", "same9"), 0);
+    CBAT_CHECK(cbat_compare_natural(NULL, "x") < 0);
+    CBAT_CHECK(cbat_compare_natural("x", NULL) > 0);
+    CBAT_CHECK_EQ_INT(cbat_compare_natural(NULL, NULL), 0);
+    CBAT_CHECK(cbat_compare_natural_elements(&a, &b) < 0);
+    CBAT_CHECK(cbat_compare_natural_elements(NULL, &b) < 0);
+    CBAT_CHECK(cbat_compare_natural_elements(&a, NULL) > 0);
+    cbat_string_free(s);
+}
+
+CBAT_TEST(test_split_limits_lines_and_partition) {
+    CBatList *parts = NULL;
+    CBatString *before = NULL, *after = NULL;
+    CBAT_REQUIRE_OK(cbat_string_split_max("a::b::c::", "::", 2, &parts));
+    CBAT_REQUIRE_EQ_SIZE(parts->length, 3);
+    CBAT_CHECK_EQ_STR(cbat_string_cstr(CBAT_LIST_GET(parts, CBatString *, 2)), "c::");
+    cbat_list_free(parts);
+    CBAT_REQUIRE_OK(cbat_string_split_max("a,b", ",", 0, &parts));
+    CBAT_CHECK_EQ_SIZE(parts->length, 1);
+    CBAT_CHECK_EQ_STR(cbat_string_cstr(CBAT_LIST_GET(parts, CBatString *, 0)), "a,b");
+    cbat_list_free(parts);
+    CBAT_REQUIRE_OK(cbat_string_split_lines("a\r\nb\rc\n\n", &parts));
+    CBAT_REQUIRE_EQ_SIZE(parts->length, 4);
+    CBAT_CHECK_EQ_STR(cbat_string_cstr(CBAT_LIST_GET(parts, CBatString *, 0)), "a");
+    CBAT_CHECK_EQ_STR(cbat_string_cstr(CBAT_LIST_GET(parts, CBatString *, 1)), "b");
+    CBAT_CHECK_EQ_STR(cbat_string_cstr(CBAT_LIST_GET(parts, CBatString *, 2)), "c");
+    CBAT_CHECK_EQ_STR(cbat_string_cstr(CBAT_LIST_GET(parts, CBatString *, 3)), "");
+    cbat_list_free(parts);
+    CBAT_REQUIRE_OK(cbat_string_split_lines("", &parts)); CBAT_CHECK_EQ_SIZE(parts->length, 0);
+    cbat_list_free(parts); parts = NULL;
+    CBAT_REQUIRE_OK(cbat_string_partition("name=value=extra", "=", &before, &after));
+    CBAT_CHECK_EQ_STR(before->data, "name"); CBAT_CHECK_EQ_STR(after->data, "value=extra");
+    cbat_string_free(before); cbat_string_free(after); before = after = NULL;
+    CBAT_CHECK_ERR(cbat_string_partition("none", "=", &before, &after), CBAT_ERR_NOT_FOUND);
+    CBAT_CHECK_NULL(before); CBAT_CHECK_NULL(after);
+    CBAT_CHECK_ERR(cbat_string_partition("x", "", &before, &after), CBAT_ERR_INVALID_ARGUMENT);
+    CBAT_CHECK_ERR(cbat_string_partition(NULL, "=", &before, &after), CBAT_ERR_INVALID_ARGUMENT);
+    CBAT_CHECK_ERR(cbat_string_partition("x", NULL, &before, &after), CBAT_ERR_INVALID_ARGUMENT);
+    CBAT_CHECK_ERR(cbat_string_partition("x", "=", NULL, &after), CBAT_ERR_INVALID_ARGUMENT);
+    CBAT_CHECK_ERR(cbat_string_partition("x", "=", &before, NULL), CBAT_ERR_INVALID_ARGUMENT);
+    CBAT_CHECK_ERR(cbat_string_partition("x", "=", &before, &before), CBAT_ERR_INVALID_ARGUMENT);
+    CBAT_CHECK_ERR(cbat_string_split_max(NULL, ",", 1, &parts), CBAT_ERR_INVALID_ARGUMENT);
+    CBAT_CHECK_ERR(cbat_string_split_max("a", NULL, 1, &parts), CBAT_ERR_INVALID_ARGUMENT);
+    CBAT_CHECK_ERR(cbat_string_split_max("a", "", 1, &parts), CBAT_ERR_INVALID_ARGUMENT);
+    CBAT_CHECK_ERR(cbat_string_split_max("a", ",", 1, NULL), CBAT_ERR_INVALID_ARGUMENT);
+    CBAT_CHECK_ERR(cbat_string_split_lines(NULL, &parts), CBAT_ERR_INVALID_ARGUMENT);
+    CBAT_CHECK_ERR(cbat_string_split_lines("x", NULL), CBAT_ERR_INVALID_ARGUMENT);
+}
+
+CBAT_TEST(test_utf8_reverse_and_slice) {
+    const char *text = "A\xC3\xA9\xF0\x9F\x98\x80";
+    CBatString *result = NULL;
+    CBAT_REQUIRE_OK(cbat_utf8_reverse(text, &result));
+    CBAT_CHECK_EQ_STR(result->data, "\xF0\x9F\x98\x80\xC3\xA9" "A");
+    cbat_string_free(result);
+    CBAT_REQUIRE_OK(cbat_utf8_substring(text, 1, 2, &result));
+    CBAT_CHECK_EQ_STR(result->data, "\xC3\xA9\xF0\x9F\x98\x80");
+    cbat_string_free(result);
+    CBAT_REQUIRE_OK(cbat_utf8_substring(text, SIZE_MAX, SIZE_MAX, &result));
+    CBAT_CHECK_EQ_STR(result->data, ""); cbat_string_free(result);
+    CBAT_REQUIRE_OK(cbat_utf8_substring(text, 0, SIZE_MAX, &result));
+    CBAT_CHECK_EQ_STR(result->data, text); cbat_string_free(result);
+    CBAT_REQUIRE_OK(cbat_utf8_reverse("", &result));
+    CBAT_CHECK_EQ_STR(result->data, ""); cbat_string_free(result); result = NULL;
+    CBAT_CHECK_ERR(cbat_utf8_reverse("\xC0\xAF", &result), CBAT_ERR_INVALID_UTF8);
+    CBAT_CHECK_ERR(cbat_utf8_substring("ok\xED\xA0\x80", 0, 1, &result), CBAT_ERR_INVALID_UTF8);
+    CBAT_CHECK_NULL(result);
+    CBAT_CHECK_ERR(cbat_utf8_reverse(NULL, &result), CBAT_ERR_INVALID_ARGUMENT);
+    CBAT_CHECK_ERR(cbat_utf8_reverse("x", NULL), CBAT_ERR_INVALID_ARGUMENT);
+    CBAT_CHECK_ERR(cbat_utf8_substring(NULL, 0, 1, &result), CBAT_ERR_INVALID_ARGUMENT);
+    CBAT_CHECK_ERR(cbat_utf8_substring("x", 0, 1, NULL), CBAT_ERR_INVALID_ARGUMENT);
+}
+
+CBAT_TEST(test_string_extras_allocation_failures) {
+    size_t allowed;
+    bool split = false, lines = false, partition = false, reversed = false, sliced = false;
+    for (allowed = 0; allowed < 40; allowed++) {
+        CBatList *parts = NULL;
+        CBatString *a = NULL, *b = NULL;
+        CBatError err;
+        cbat_test_fail_allocations_after(allowed);
+        err = cbat_string_split_max("a,b,c", ",", 1, &parts);
+        cbat_test_stop_failing_allocations();
+        if (err == CBAT_OK) split = true;
+        else { CBAT_CHECK_ERR(err, CBAT_ERR_NO_MEMORY); CBAT_CHECK_NULL(parts); }
+        cbat_list_free(parts); parts = NULL;
+        cbat_test_fail_allocations_after(allowed);
+        err = cbat_string_split_lines("a\nb\r\nc", &parts);
+        cbat_test_stop_failing_allocations();
+        if (err == CBAT_OK) lines = true;
+        else { CBAT_CHECK_ERR(err, CBAT_ERR_NO_MEMORY); CBAT_CHECK_NULL(parts); }
+        cbat_list_free(parts);
+        cbat_test_fail_allocations_after(allowed);
+        err = cbat_string_partition("key=value", "=", &a, &b);
+        cbat_test_stop_failing_allocations();
+        if (err == CBAT_OK) partition = true;
+        else { CBAT_CHECK_ERR(err, CBAT_ERR_NO_MEMORY); CBAT_CHECK_NULL(a); CBAT_CHECK_NULL(b); }
+        cbat_string_free(a); cbat_string_free(b); a = NULL;
+        cbat_test_fail_allocations_after(allowed);
+        err = cbat_utf8_reverse("A\xC3\xA9", &a);
+        cbat_test_stop_failing_allocations();
+        if (err == CBAT_OK) reversed = true;
+        else { CBAT_CHECK_ERR(err, CBAT_ERR_NO_MEMORY); CBAT_CHECK_NULL(a); }
+        cbat_string_free(a); a = NULL;
+        cbat_test_fail_allocations_after(allowed);
+        err = cbat_utf8_substring("A\xC3\xA9", 1, 1, &a);
+        cbat_test_stop_failing_allocations();
+        if (err == CBAT_OK) sliced = true;
+        else { CBAT_CHECK_ERR(err, CBAT_ERR_NO_MEMORY); CBAT_CHECK_NULL(a); }
+        cbat_string_free(a);
+        CBAT_CHECK_EQ_SIZE(cbat_test_live_allocations(), 0);
+        if (split && lines && partition && reversed && sliced) break;
+    }
+    CBAT_CHECK(split && lines && partition && reversed && sliced);
+    {
+        CBatString *s = cbat_string_from("abc");
+        CBatError a, b, c;
+        CBAT_REQUIRE_NOT_NULL(s);
+        cbat_test_fail_allocations_after(0);
+        a = cbat_string_pad_left(s, 1000, '.');
+        b = cbat_string_pad_right(s, 1000, '.');
+        c = cbat_string_center(s, 1000, '.');
+        cbat_test_stop_failing_allocations();
+        CBAT_CHECK_ERR(a, CBAT_ERR_NO_MEMORY); CBAT_CHECK_ERR(b, CBAT_ERR_NO_MEMORY); CBAT_CHECK_ERR(c, CBAT_ERR_NO_MEMORY);
+        CBAT_CHECK_EQ_STR(s->data, "abc");
+        cbat_string_free(s);
+    }
+}
+
 CBAT_TEST(test_out_of_memory) {
     size_t n;
     for (n = 0; n < 6; n++) {
@@ -565,6 +756,11 @@ static const CBatTestCase tests[] = {
     CBAT_TEST_ENTRY(test_shortest_double_notation),
     CBAT_TEST_ENTRY(test_random_double_round_trips),
     CBAT_TEST_ENTRY(test_numeric_locale_and_allocation_errors),
+    CBAT_TEST_ENTRY(test_padding_stripping_and_prefix_suffix),
+    CBAT_TEST_ENTRY(test_ascii_predicates_and_natural_order),
+    CBAT_TEST_ENTRY(test_split_limits_lines_and_partition),
+    CBAT_TEST_ENTRY(test_utf8_reverse_and_slice),
+    CBAT_TEST_ENTRY(test_string_extras_allocation_failures),
     CBAT_TEST_ENTRY(test_out_of_memory),
 };
 
