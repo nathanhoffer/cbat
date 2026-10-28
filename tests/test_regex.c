@@ -116,7 +116,8 @@ CBAT_TEST(test_nullable_cycles_limits_and_allocator) {
     CBAT_CHECK_ERR(cbat_regex_compile("a", 8, &regex, NULL), CBAT_ERR_INVALID_ARGUMENT);
     CBAT_CHECK_ERR(cbat_regex_compile("a", 0, NULL, NULL), CBAT_ERR_INVALID_ARGUMENT);
     for (i = 0; i < 129; i++) memcpy(nesting + i*3, "(?:", 3);
-    for (i = 0; i < 129; i++) nesting[387+i] = ')'; nesting[516] = 0;
+    for (i = 0; i < 129; i++) nesting[387+i] = ')';
+    nesting[516] = 0;
     CBAT_CHECK_ERR(cbat_regex_compile(nesting, 0, &regex, NULL), CBAT_ERR_OUT_OF_RANGE);
     arena = cbat_arena_new(4096); CBAT_REQUIRE_NOT_NULL(arena);
     CBAT_REQUIRE_OK(cbat_regex_compile_with("a{2,}", 0, cbat_arena_allocator(arena), &regex, NULL));
