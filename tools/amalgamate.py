@@ -61,7 +61,7 @@ def main():
         if module in optional:
             flag = "CBAT_WITH_" + module.upper()
             condition = f"(!defined({flag}) || {flag})"
-            if module == "linalg":
+            if module in ("linalg", "ml"):
                 condition += " && (!defined(CBAT_WITH_NDARRAY) || CBAT_WITH_NDARRAY)"
             block = f"#if {condition}\n" + block + "#endif\n"
         sources.append(block)
@@ -73,7 +73,7 @@ def main():
         if module in optional:
             flag = "CBAT_WITH_" + module.upper()
             condition = f"(!defined({flag}) || {flag})"
-            if module == "linalg":
+            if module in ("linalg", "ml"):
                 condition += " && (!defined(CBAT_WITH_NDARRAY) || CBAT_WITH_NDARRAY)"
             block = f"#if {condition}\n" + block + "#endif\n"
         headers.append(block)

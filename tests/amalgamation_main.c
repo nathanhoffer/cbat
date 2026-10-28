@@ -59,5 +59,16 @@ int main(void) {
         cbat_array_free(identity);
     }
 #endif
+#if (!defined(CBAT_WITH_NDARRAY) || CBAT_WITH_NDARRAY) && (!defined(CBAT_WITH_ML) || CBAT_WITH_ML)
+    {
+        size_t shape[2] = {1,1};
+        CBatArray *array = NULL;
+        if (cbat_array_new(2, shape, &array) != CBAT_OK) return 1;
+        if (cbat_ml_normalize_columns(array) != CBAT_OK || cbat_array_data(array)[0] != 0) {
+            cbat_array_free(array); return 1;
+        }
+        cbat_array_free(array);
+    }
+#endif
     return 0;
 }

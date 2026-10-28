@@ -116,6 +116,10 @@ multiplication, transpose, pivoted solves, inverses and determinants. Their
 options are `CBAT_WITH_NDARRAY` and `CBAT_WITH_LINALG`; linalg requires ndarray.
 For the single header, setting `CBAT_WITH_NDARRAY 0` also omits linalg.
 
+`cbat/ml.h` adds QR linear regression, k-means, kNN, reproducible train/test
+index splitting and population z-scores. `CBAT_WITH_ML` requires ndarray;
+the single-header edition also omits ML when ndarray is disabled.
+
 Build and install to a prefix you own (no administrator access required):
 
 ```bash

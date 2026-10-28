@@ -23,6 +23,9 @@ Versions use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Optional ML helpers: centered/scaled pivoted-QR regression, k-means, kNN,
+  train/test index splitting and atomic column normalization, with numeric,
+  reproducibility/OOM coverage and a small-data cookbook recipe.
 - Optional multidimensional double arrays with broadcasting/reductions and
   dense linear algebra with batched/vector matrix multiplication, transpose,
   partial-pivoted LU solve/inverse/determinant, plus a numeric cookbook recipe.
