@@ -10,6 +10,7 @@
 #include "cbat/fs.h"
 
 #define CBAT__FILE_CHUNK 65536
+#define CBAT__LINE_CHUNK 8192
 
 struct CBatLineReader {
     FILE *file;
@@ -17,6 +18,11 @@ struct CBatLineReader {
     CBatString *line;
     size_t line_number;
     bool finished;
+    bool accumulating;
+    CBatError read_error;
+    size_t position;
+    size_t available;
+    unsigned char buffer[CBAT__LINE_CHUNK];
 };
 
 static CBatError cbat__file_open(const char *path, const char *mode, FILE **out) {
@@ -162,6 +168,10 @@ static CBatError cbat__line_reader_new(FILE *file, bool owns_file, CBatLineReade
     reader->owns_file = owns_file;
     reader->line_number = 0;
     reader->finished = false;
+    reader->accumulating = false;
+    reader->read_error = CBAT_OK;
+    reader->position = 0;
+    reader->available = 0;
     *out = reader;
     return CBAT_OK;
 }
@@ -192,41 +202,72 @@ CBatError cbat_line_reader_from_file(FILE *file, CBatLineReader **out) {
 
 CBatError cbat_line_reader_next(CBatLineReader *reader, const char **line, size_t *length) {
     CBatString *s;
-    bool any = false;
     if (reader == NULL) {
         return CBAT_ERR_INVALID_ARGUMENT;
     }
     if (reader->finished) {
         return CBAT_ERR_END;
     }
+    if (reader->read_error != CBAT_OK) {
+        return reader->read_error;
+    }
     s = reader->line;
-    cbat_string_clear(s);
+    if (!reader->accumulating) {
+        cbat_string_clear(s);
+        reader->accumulating = true;
+    }
     for (;;) {
-        int c = fgetc(reader->file);
+        const unsigned char *start;
+        const unsigned char *newline;
+        size_t count;
         CBatError err;
-        if (c == EOF) {
+        if (reader->position == reader->available) {
+            reader->position = 0;
+            if (reader->owns_file) {
+                reader->available = fread(reader->buffer, 1, sizeof(reader->buffer), reader->file);
+            } else {
+                /* A borrowed stream may be interactive, or used by the caller
+                 * after close. Never read ahead past the requested line. */
+                int c = fgetc(reader->file);
+                reader->available = c == EOF ? 0 : 1;
+                if (c != EOF) {
+                    reader->buffer[0] = (unsigned char)c;
+                }
+            }
             if (ferror(reader->file)) {
-                return CBAT_ERR_IO;
+                reader->read_error = CBAT_ERR_IO;
+                return reader->read_error;
             }
-            reader->finished = true;
-            if (!any) {
-                return CBAT_ERR_END;
+            if (reader->available == 0) {
+                reader->finished = true;
+                if (s->length == 0) {
+                    return CBAT_ERR_END;
+                }
+                break;
             }
-            break;
         }
-        any = true;
-        if (c == '\n') {
-            break;
+        start = reader->buffer + reader->position;
+        count = reader->available - reader->position;
+        newline = (const unsigned char *)memchr(start, '\n', count);
+        if (newline != NULL) {
+            count = (size_t)(newline - start);
         }
-        err = cbat_string_append_char(s, (char)c);
+        err = cbat_string_append_length(s, (const char *)start, count);
         if (err != CBAT_OK) {
+            /* Keep both the partial line and unread bytes for an OOM retry. */
             return err;
+        }
+        reader->position += count;
+        if (newline != NULL) {
+            reader->position++;
+            break;
         }
     }
     if (s->length > 0 && s->data[s->length - 1] == '\r') {
         cbat_string_truncate(s, s->length - 1);
     }
     reader->line_number++;
+    reader->accumulating = false;
     if (line != NULL) {
         *line = s->data;
     }

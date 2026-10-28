@@ -54,18 +54,23 @@ CBAT_API CBatError cbat_file_copy(const char *from, const char *to);
 
 typedef struct CBatLineReader CBatLineReader;
 
-/** Opens `path` for line-by-line reading. */
+/** Opens `path` for buffered line-by-line reading, using bounded read-ahead. */
 CBAT_API CBatError cbat_line_reader_open(const char *path, CBatLineReader **out);
 
 /**
  * Reads lines from an already-open FILE (e.g. stdin). The reader does not
- * close `file`.
+ * close `file` or read ahead past a line, so stdin remains interactive and
+ * the caller can continue reading the stream after closing the reader.
+ * Do not read or reposition the stream while the reader is in use.
  */
 CBAT_API CBatError cbat_line_reader_from_file(FILE *file, CBatLineReader **out);
 
 /**
  * Reads the next line. *line stays valid until the next call. Returns
  * CBAT_ERR_END after the last line, CBAT_ERR_IO on a read error.
+ * Embedded NUL bytes are preserved; use *length rather than strlen().
+ * On allocation failure, outputs and the line number are unchanged; retrying
+ * resumes the same line. A read error is terminal: close the reader.
  */
 CBAT_API CBatError cbat_line_reader_next(CBatLineReader *reader, const char **line,
                                          size_t *length);
