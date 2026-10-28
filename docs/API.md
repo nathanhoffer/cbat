@@ -1314,6 +1314,24 @@ CBAT_API void cbat_sha256_hex(const void *data, size_t length, char hex[CBAT_SHA
 
 One-shot lowercase hex digest, NUL-terminated.
 
+```c
+CBAT_API void cbat_hmac_sha256(const void *key, size_t key_length, const void *data, size_t length, uint8_t out[32]);
+```
+
+HMAC-SHA256 (RFC 4231), 32-byte output. NULL input means empty; NULL output ignored.
+
+```c
+CBAT_API void cbat_sha1(const void *data, size_t length, uint8_t out[20]);
+```
+
+SHA-1, 20 bytes. Legacy checksums only: unsuitable for security. NULL input means empty; NULL output ignored.
+
+```c
+CBAT_API void cbat_md5(const void *data, size_t length, uint8_t out[16]);
+```
+
+MD5, 16 bytes. Legacy checksums only: unsuitable for security. NULL input means empty; NULL output ignored.
+
 
 ## heap
 
@@ -2516,6 +2534,26 @@ CBAT_API void *cbat_random_choice(CBatRandom *rng, const CBatList *list);
 
 Pointer to a random element of the list, or NULL if it is empty.
 
+```c
+CBAT_API CBatError cbat_random_sample(CBatRandom *rng, const CBatList *list, size_t count, CBatList **out);
+```
+
+Uniform sample without repeated source positions, in random order. Shallow
+element copies with no destructor; pointed-to resources remain borrowed.
+count > list length gives OUT_OF_RANGE. Output unchanged on failure.
+
+```c
+CBAT_API CBatError cbat_random_weighted_index(CBatRandom *rng, const double *weights, size_t count, size_t *out);
+```
+
+Selects proportionally to finite nonnegative weights; all-zero/empty is INVALID_ARGUMENT.
+
+```c
+CBAT_API void cbat_random_uuid4(CBatRandom *rng, char out[37]);
+```
+
+Writes lowercase UUID version 4 (36 bytes plus NUL). Pseudorandom, not cryptographically secure. NULL out ignored.
+
 
 ## set
 
@@ -3470,6 +3508,48 @@ CBAT_API CBatError cbat_datetime_days_between(const CBatDateTime *a, const CBatD
 ```
 
 Whole days from a to b (b - a), counting calendar days in each own offset.
+
+```c
+CBAT_API CBatError cbat_datetime_add_days(CBatDateTime *dt, int64_t days);
+```
+
+Adds calendar days in place, preserving clock/offset; years limited to +/- 1 billion. Atomic on error.
+
+```c
+CBAT_API CBatError cbat_datetime_add_months(CBatDateTime *dt, int64_t months);
+```
+
+Adds calendar months, clamping day to the destination month. Same range/atomicity as add_days.
+
+```c
+CBAT_API int cbat_datetime_day_of_year(const CBatDateTime *dt);
+```
+
+1..366, or 0 for invalid date/out-of-range year (+/- 1 billion).
+
+```c
+CBAT_API void cbat_datetime_iso_week(const CBatDateTime *dt, int64_t *year, int *week);
+```
+
+ISO week-year/week (Monday first); invalid input writes 0. Outputs may be NULL.
+
+```c
+CBAT_API int cbat_datetime_compare(const CBatDateTime *a, const CBatDateTime *b);
+```
+
+Orders by instant, including nanoseconds. Invalid inputs compare equal.
+
+```c
+CBAT_API CBatError cbat_datetime_local_now(CBatDateTime *out);
+```
+
+Current local date/time with UTC offset filled in.
+
+```c
+CBAT_API CBatError cbat_format_duration(double seconds, CBatString **out);
+```
+
+Human duration ("1h 2m 3.5s", "250ms"); rounds to milliseconds. Finite |seconds| <= 9e12.
 
 ```c
 CBAT_API CBatError cbat_datetime_format_iso(const CBatDateTime *dt, CBatString **out);

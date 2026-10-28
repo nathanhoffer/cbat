@@ -131,7 +131,54 @@ CBAT_TEST(test_global_generator) {
     cbat_random_seed_from_time(NULL);
 }
 
+CBAT_TEST(test_sample_weighted_uuid) {
+    CBatRandom rng;
+    CBatList *source = cbat_list_new(sizeof(int)), *sample = NULL;
+    double weights[] = {0, 1, 0};
+    char uuid[37];
+    size_t i, j, index = 99, allowed;
+    bool succeeded = false;
+    CBAT_REQUIRE_NOT_NULL(source);
+    for (i = 0; i < 50; i++) { int n = (int)i; CBAT_REQUIRE_OK(cbat_list_push(source, &n)); }
+    cbat_random_seed(&rng, 42);
+    CBAT_REQUIRE_OK(cbat_random_sample(&rng, source, 20, &sample));
+    CBAT_CHECK_EQ_INT(sample->length, 20);
+    for (i = 0; i < sample->length; i++) {
+        int n = *(int *)cbat_list_get(sample, i);
+        CBAT_CHECK(n >= 0 && n < 50);
+        for (j = 0; j < i; j++) CBAT_CHECK(n != *(int *)cbat_list_get(sample, j));
+    }
+    cbat_list_free(sample); sample = NULL;
+    CBAT_CHECK_ERR(cbat_random_sample(&rng, source, 51, &sample), CBAT_ERR_OUT_OF_RANGE);
+    CBAT_CHECK_ERR(cbat_random_sample(&rng, NULL, 0, &sample), CBAT_ERR_INVALID_ARGUMENT);
+    CBAT_CHECK_ERR(cbat_random_sample(&rng, source, 0, NULL), CBAT_ERR_INVALID_ARGUMENT);
+    CBAT_REQUIRE_OK(cbat_random_sample(&rng, source, 0, &sample));
+    CBAT_CHECK_EQ_INT(sample->length, 0); cbat_list_free(sample); sample = NULL;
+    for (i = 0; i < 100; i++) {
+        CBAT_REQUIRE_OK(cbat_random_weighted_index(&rng, weights, 3, &index)); CBAT_CHECK_EQ_INT(index, 1);
+    }
+    weights[1] = 0;
+    CBAT_CHECK_ERR(cbat_random_weighted_index(&rng, weights, 3, &index), CBAT_ERR_INVALID_ARGUMENT);
+    weights[1] = -1;
+    CBAT_CHECK_ERR(cbat_random_weighted_index(&rng, weights, 3, &index), CBAT_ERR_INVALID_ARGUMENT);
+    CBAT_CHECK_ERR(cbat_random_weighted_index(&rng, NULL, 0, &index), CBAT_ERR_INVALID_ARGUMENT);
+    cbat_random_uuid4(&rng, uuid); cbat_random_uuid4(&rng, NULL);
+    CBAT_CHECK_EQ_INT(strlen(uuid), 36); CBAT_CHECK_EQ_INT(uuid[14], '4');
+    CBAT_CHECK(uuid[19] == '8' || uuid[19] == '9' || uuid[19] == 'a' || uuid[19] == 'b');
+    CBAT_CHECK_EQ_INT(uuid[8], '-'); CBAT_CHECK_EQ_INT(uuid[13], '-');
+    for (allowed = 0; allowed < 20; allowed++) {
+        CBatError err;
+        cbat_test_fail_allocations_after(allowed);
+        err = cbat_random_sample(&rng, source, 20, &sample);
+        cbat_test_stop_failing_allocations();
+        if (err == CBAT_OK) { succeeded = true; cbat_list_free(sample); break; }
+        CBAT_CHECK_ERR(err, CBAT_ERR_NO_MEMORY); CBAT_CHECK_NULL(sample);
+    }
+    CBAT_CHECK(succeeded); cbat_list_free(source);
+}
+
 static const CBatTestCase tests[] = {
+    CBAT_TEST_ENTRY(test_sample_weighted_uuid),
     CBAT_TEST_ENTRY(test_pcg32_reference_vector),
     CBAT_TEST_ENTRY(test_same_seed_same_sequence),
     CBAT_TEST_ENTRY(test_range_bounds_and_coverage),

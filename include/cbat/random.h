@@ -72,6 +72,17 @@ CBAT_API void cbat_random_shuffle_list(CBatRandom *rng, CBatList *list);
 /** Pointer to a random element of the list, or NULL if it is empty. */
 CBAT_API void *cbat_random_choice(CBatRandom *rng, const CBatList *list);
 
+/**
+ * Uniform sample without repeated source positions, in random order. Shallow
+ * element copies with no destructor; pointed-to resources remain borrowed.
+ * count > list length gives OUT_OF_RANGE. Output unchanged on failure.
+ */
+CBAT_API CBatError cbat_random_sample(CBatRandom *rng, const CBatList *list, size_t count, CBatList **out);
+/** Selects proportionally to finite nonnegative weights; all-zero/empty is INVALID_ARGUMENT. */
+CBAT_API CBatError cbat_random_weighted_index(CBatRandom *rng, const double *weights, size_t count, size_t *out);
+/** Writes lowercase UUID version 4 (36 bytes plus NUL). Pseudorandom, not cryptographically secure. NULL out ignored. */
+CBAT_API void cbat_random_uuid4(CBatRandom *rng, char out[37]);
+
 CBAT_END_DECLS
 
 #endif /* CBAT_RANDOM_H */

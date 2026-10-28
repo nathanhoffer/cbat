@@ -74,6 +74,21 @@ CBAT_API CBatError cbat_datetime_add_seconds(const CBatDateTime *dt, double seco
 CBAT_API CBatError cbat_datetime_days_between(const CBatDateTime *a, const CBatDateTime *b,
                                               int64_t *out);
 
+/** Adds calendar days in place, preserving clock/offset; years limited to +/- 1 billion. Atomic on error. */
+CBAT_API CBatError cbat_datetime_add_days(CBatDateTime *dt, int64_t days);
+/** Adds calendar months, clamping day to the destination month. Same range/atomicity as add_days. */
+CBAT_API CBatError cbat_datetime_add_months(CBatDateTime *dt, int64_t months);
+/** 1..366, or 0 for invalid date/out-of-range year (+/- 1 billion). */
+CBAT_API int cbat_datetime_day_of_year(const CBatDateTime *dt);
+/** ISO week-year/week (Monday first); invalid input writes 0. Outputs may be NULL. */
+CBAT_API void cbat_datetime_iso_week(const CBatDateTime *dt, int64_t *year, int *week);
+/** Orders by instant, including nanoseconds. Invalid inputs compare equal. */
+CBAT_API int cbat_datetime_compare(const CBatDateTime *a, const CBatDateTime *b);
+/** Current local date/time with UTC offset filled in. */
+CBAT_API CBatError cbat_datetime_local_now(CBatDateTime *out);
+/** Human duration ("1h 2m 3.5s", "250ms"); rounds to milliseconds. Finite |seconds| <= 9e12. */
+CBAT_API CBatError cbat_format_duration(double seconds, CBatString **out);
+
 /**
  * ISO 8601: "YYYY-MM-DDTHH:MM:SS[.fraction](Z|+HH:MM)". The fraction is
  * printed only when nanosecond != 0, without trailing zeros.

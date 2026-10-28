@@ -54,6 +54,13 @@ CBAT_API void cbat_sha256(const void *data, size_t length, unsigned char digest[
 /** One-shot lowercase hex digest, NUL-terminated. */
 CBAT_API void cbat_sha256_hex(const void *data, size_t length, char hex[CBAT_SHA256_HEX_SIZE]);
 
+/** HMAC-SHA256 (RFC 4231), 32-byte output. NULL input means empty; NULL output ignored. */
+CBAT_API void cbat_hmac_sha256(const void *key, size_t key_length, const void *data, size_t length, uint8_t out[32]);
+/** SHA-1, 20 bytes. Legacy checksums only: unsuitable for security. NULL input means empty; NULL output ignored. */
+CBAT_API void cbat_sha1(const void *data, size_t length, uint8_t out[20]);
+/** MD5, 16 bytes. Legacy checksums only: unsuitable for security. NULL input means empty; NULL output ignored. */
+CBAT_API void cbat_md5(const void *data, size_t length, uint8_t out[16]);
+
 CBAT_END_DECLS
 
 #endif /* CBAT_HASH_H */

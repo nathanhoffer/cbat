@@ -141,7 +141,50 @@ CBAT_TEST(test_strftime_format) {
     cbat_string_free(s);
 }
 
+CBAT_TEST(test_calendar_extras_and_duration) {
+    CBatDateTime dt, other, original;
+    CBatString *text = NULL;
+    int64_t year;
+    int week;
+    size_t n;
+    bool succeeded = false;
+    CBAT_REQUIRE_OK(cbat_datetime_parse_iso("2024-01-31T12:30:00+02:00", &dt, NULL));
+    CBAT_REQUIRE_OK(cbat_datetime_add_months(&dt, 1));
+    CBAT_CHECK_EQ_INT(dt.month, 2); CBAT_CHECK_EQ_INT(dt.day, 29);
+    CBAT_CHECK_EQ_INT(cbat_datetime_day_of_year(&dt), 60);
+    CBAT_REQUIRE_OK(cbat_datetime_add_days(&dt, 1)); CBAT_CHECK_EQ_INT(dt.month, 3); CBAT_CHECK_EQ_INT(dt.day, 1);
+    CBAT_REQUIRE_OK(cbat_datetime_add_months(&dt, -14)); CBAT_CHECK_EQ_INT(dt.year, 2023); CBAT_CHECK_EQ_INT(dt.month, 1);
+    original = dt;
+    CBAT_CHECK_ERR(cbat_datetime_add_days(&dt, INT64_MAX), CBAT_ERR_OUT_OF_RANGE);
+    CBAT_CHECK_ERR(cbat_datetime_add_months(&dt, INT64_MIN), CBAT_ERR_OUT_OF_RANGE);
+    CBAT_CHECK_EQ_INT(dt.year, original.year); CBAT_CHECK_EQ_INT(dt.day, original.day);
+    CBAT_REQUIRE_OK(cbat_datetime_parse_iso("2021-01-01", &dt, NULL));
+    cbat_datetime_iso_week(&dt, &year, &week); CBAT_CHECK_EQ_INT(year, 2020); CBAT_CHECK_EQ_INT(week, 53);
+    CBAT_REQUIRE_OK(cbat_datetime_parse_iso("2021-01-04", &dt, NULL));
+    cbat_datetime_iso_week(&dt, &year, &week); CBAT_CHECK_EQ_INT(year, 2021); CBAT_CHECK_EQ_INT(week, 1);
+    CBAT_REQUIRE_OK(cbat_datetime_parse_iso("2024-01-01T12:00:00+02:00", &dt, NULL));
+    CBAT_REQUIRE_OK(cbat_datetime_parse_iso("2024-01-01T10:00:00Z", &other, NULL));
+    CBAT_CHECK_EQ_INT(cbat_datetime_compare(&dt, &other), 0);
+    other.nanosecond = 1; CBAT_CHECK(cbat_datetime_compare(&dt, &other) < 0);
+    CBAT_CHECK_ERR(cbat_datetime_add_days(NULL, 0), CBAT_ERR_INVALID_ARGUMENT);
+    CBAT_CHECK_ERR(cbat_datetime_add_months(NULL, 0), CBAT_ERR_INVALID_ARGUMENT);
+    CBAT_CHECK_EQ_INT(cbat_datetime_day_of_year(NULL), 0);
+    cbat_datetime_iso_week(NULL, &year, &week); CBAT_CHECK_EQ_INT(year, 0); CBAT_CHECK_EQ_INT(week, 0);
+    CBAT_REQUIRE_OK(cbat_datetime_local_now(&dt)); CBAT_CHECK(cbat_datetime_is_valid(&dt));
+    CBAT_REQUIRE_OK(cbat_format_duration(3723.5, &text)); CBAT_CHECK_EQ_STR(text->data, "1h 2m 3.5s"); cbat_string_free(text);
+    CBAT_REQUIRE_OK(cbat_format_duration(-0.25, &text)); CBAT_CHECK_EQ_STR(text->data, "-250ms"); cbat_string_free(text); text = NULL;
+    CBAT_CHECK_ERR(cbat_format_duration(1e20, &text), CBAT_ERR_OUT_OF_RANGE);
+    for (n = 0; n < 20; n++) {
+        CBatError err;
+        cbat_test_fail_allocations_after(n); err = cbat_format_duration(3723.5, &text); cbat_test_stop_failing_allocations();
+        if (err == CBAT_OK) { succeeded = true; cbat_string_free(text); break; }
+        CBAT_CHECK_ERR(err, CBAT_ERR_NO_MEMORY); CBAT_CHECK_NULL(text);
+    }
+    CBAT_CHECK(succeeded);
+}
+
 static const CBatTestCase tests[] = {
+    CBAT_TEST_ENTRY(test_calendar_extras_and_duration),
     CBAT_TEST_ENTRY(test_clocks),
     CBAT_TEST_ENTRY(test_leap_years_and_month_lengths),
     CBAT_TEST_ENTRY(test_from_timestamp_utc),

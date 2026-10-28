@@ -273,6 +273,92 @@ CBatError cbat_datetime_days_between(const CBatDateTime *a, const CBatDateTime *
     return CBAT_OK;
 }
 
+static bool cbat__calendar_supported(const CBatDateTime *dt) {
+    return cbat_datetime_is_valid(dt) && dt->year >= -1000000000 && dt->year <= 1000000000;
+}
+
+CBatError cbat_datetime_add_days(CBatDateTime *dt, int64_t days) {
+    int64_t current, result, low = cbat__days_from_civil(-1000000000, 1, 1);
+    int64_t high = cbat__days_from_civil(1000000000, 12, 31);
+    if (!cbat__calendar_supported(dt)) return CBAT_ERR_INVALID_ARGUMENT;
+    current = cbat__days_from_civil(dt->year, dt->month, dt->day);
+    if (days < low - current || days > high - current) return CBAT_ERR_OUT_OF_RANGE;
+    result = current + days;
+    cbat__civil_from_days(result, &dt->year, &dt->month, &dt->day);
+    dt->weekday = cbat__weekday(result);
+    return CBAT_OK;
+}
+
+CBatError cbat_datetime_add_months(CBatDateTime *dt, int64_t months) {
+    int64_t current, result, year;
+    int month, day;
+    if (!cbat__calendar_supported(dt)) return CBAT_ERR_INVALID_ARGUMENT;
+    current = dt->year * 12 + dt->month - 1;
+    if (months < -12000000000LL - current || months > 12000000011LL - current) return CBAT_ERR_OUT_OF_RANGE;
+    result = current + months;
+    year = result / 12; month = (int)(result % 12);
+    if (month < 0) { month += 12; year--; }
+    month++;
+    day = cbat_time_days_in_month(year, month);
+    dt->year = year; dt->month = month;
+    if (dt->day > day) dt->day = day;
+    dt->weekday = cbat__weekday(cbat__days_from_civil(year, month, dt->day));
+    return CBAT_OK;
+}
+
+int cbat_datetime_day_of_year(const CBatDateTime *dt) {
+    if (!cbat__calendar_supported(dt)) return 0;
+    return (int)(cbat__days_from_civil(dt->year, dt->month, dt->day) - cbat__days_from_civil(dt->year, 1, 1)) + 1;
+}
+
+void cbat_datetime_iso_week(const CBatDateTime *dt, int64_t *year, int *week) {
+    int64_t y = 0;
+    int w = 0;
+    if (cbat__calendar_supported(dt)) {
+        int64_t day = cbat__days_from_civil(dt->year, dt->month, dt->day);
+        int m, d;
+        int64_t thursday = day + 3 - cbat__weekday(day);
+        cbat__civil_from_days(thursday, &y, &m, &d);
+        w = (int)((thursday - cbat__days_from_civil(y, 1, 1)) / 7) + 1;
+    }
+    if (year != NULL) *year = y;
+    if (week != NULL) *week = w;
+}
+
+int cbat_datetime_compare(const CBatDateTime *a, const CBatDateTime *b) {
+    int64_t x, y;
+    if (!cbat__calendar_supported(a) || !cbat__calendar_supported(b)) return 0;
+    x = cbat__datetime_epoch_seconds(a); y = cbat__datetime_epoch_seconds(b);
+    if (x != y) return x < y ? -1 : 1;
+    return (a->nanosecond > b->nanosecond) - (a->nanosecond < b->nanosecond);
+}
+
+CBatError cbat_datetime_local_now(CBatDateTime *out) { return cbat_datetime_now(true, out); }
+
+CBatError cbat_format_duration(double seconds, CBatString **out) {
+    CBatString *text;
+    CBatError err = CBAT_OK;
+    int64_t ms, hours, minutes;
+    if (out == NULL || !isfinite(seconds)) return CBAT_ERR_INVALID_ARGUMENT;
+    if (fabs(seconds) > 9e12) return CBAT_ERR_OUT_OF_RANGE;
+    ms = (int64_t)floor(fabs(seconds) * 1000 + 0.5);
+    hours = ms / 3600000; minutes = (ms / 60000) % 60;
+    text = cbat_string_new();
+    if (text == NULL) return CBAT_ERR_NO_MEMORY;
+    if (seconds < 0 && ms != 0) err = cbat_string_append_char(text, '-');
+    if (err == CBAT_OK && hours != 0) err = cbat_string_append_format(text, "%lldh", (long long)hours);
+    if (err == CBAT_OK && minutes != 0) err = cbat_string_append_format(text, "%s%lldm", hours != 0 ? " " : "", (long long)minutes);
+    if (ms < 1000) {
+        if (err == CBAT_OK) err = cbat_string_append_format(text, "%lldms", (long long)ms);
+    } else if (ms % 60000 != 0 || (hours == 0 && minutes == 0)) {
+        if (err == CBAT_OK && (hours != 0 || minutes != 0)) err = cbat_string_append_char(text, ' ');
+        if (err == CBAT_OK) err = cbat_string_append_double(text, (double)(ms % 60000) / 1000);
+        if (err == CBAT_OK) err = cbat_string_append_char(text, 's');
+    }
+    if (err != CBAT_OK) { cbat_string_free(text); return err; }
+    *out = text; return CBAT_OK;
+}
+
 /* ---- ISO 8601 ----------------------------------------------------------- */
 
 CBatError cbat_datetime_format_iso(const CBatDateTime *dt, CBatString **out) {

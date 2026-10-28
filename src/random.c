@@ -168,3 +168,61 @@ void *cbat_random_choice(CBatRandom *rng, const CBatList *list) {
     }
     return cbat_list_get(list, (size_t)cbat_random_range(rng, 0, (int64_t)list->length - 1));
 }
+
+CBatError cbat_random_sample(CBatRandom *rng, const CBatList *list, size_t count, CBatList **out) {
+    CBatList *result;
+    CBatError err;
+    size_t i;
+    if (list == NULL || out == NULL) return CBAT_ERR_INVALID_ARGUMENT;
+    if (count > list->length || list->length > INT64_MAX) return CBAT_ERR_OUT_OF_RANGE;
+    result = cbat_list_new(list->element_size);
+    if (result == NULL) return CBAT_ERR_NO_MEMORY;
+    err = cbat_list_reserve(result, count);
+    if (err != CBAT_OK) { cbat_list_free(result); return err; }
+    for (i = 0; i < count; i++) {
+        err = cbat_list_push(result, cbat_list_get(list, i));
+        if (err != CBAT_OK) { cbat_list_free(result); return err; }
+    }
+    if (count != 0) for (; i < list->length; i++) {
+        size_t j = (size_t)cbat_random_range(rng, 0, (int64_t)i);
+        if (j < count) memcpy(cbat_list_get(result, j), cbat_list_get(list, i), list->element_size);
+    }
+    cbat_random_shuffle_list(rng, result);
+    *out = result;
+    return CBAT_OK;
+}
+
+CBatError cbat_random_weighted_index(CBatRandom *rng, const double *weights, size_t count, size_t *out) {
+    size_t i, last = 0;
+    double maximum = 0, total = 0, draw;
+    if (weights == NULL || count == 0 || out == NULL) return CBAT_ERR_INVALID_ARGUMENT;
+    for (i = 0; i < count; i++) {
+        if (!isfinite(weights[i]) || weights[i] < 0) return CBAT_ERR_INVALID_ARGUMENT;
+        if (weights[i] > maximum) maximum = weights[i];
+    }
+    if (maximum == 0) return CBAT_ERR_INVALID_ARGUMENT;
+    for (i = 0; i < count; i++) total += weights[i] / maximum;
+    draw = cbat_random_double(rng) * total;
+    for (i = 0; i < count; i++) if (weights[i] > 0) {
+        last = i;
+        draw -= weights[i] / maximum;
+        if (draw < 0) { *out = i; return CBAT_OK; }
+    }
+    *out = last;
+    return CBAT_OK;
+}
+
+void cbat_random_uuid4(CBatRandom *rng, char out[37]) {
+    static const char hex[] = "0123456789abcdef";
+    unsigned char bytes[16];
+    size_t i, at = 0;
+    if (out == NULL) return;
+    cbat_random_bytes(rng, bytes, sizeof(bytes));
+    bytes[6] = (unsigned char)((bytes[6] & 15) | 64);
+    bytes[8] = (unsigned char)((bytes[8] & 63) | 128);
+    for (i = 0; i < 16; i++) {
+        if (i == 4 || i == 6 || i == 8 || i == 10) out[at++] = '-';
+        out[at++] = hex[bytes[i] >> 4]; out[at++] = hex[bytes[i] & 15];
+    }
+    out[at] = '\0';
+}

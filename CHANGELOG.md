@@ -23,6 +23,9 @@ Versions use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Calendar day/month arithmetic, ISO weeks, precise instant comparison, duration
+  formatting, random sampling/weighted selection/UUID4, HMAC-SHA256 and legacy
+  SHA-1/MD5 checksums, with published hash vectors and a cookbook recipe.
 - Optional JSON comments/trailing commas and nesting limits, recursive sorted
   output, atomic RFC 7396 merge patches, typed pointer lookups, CSV named
   records and pointer-based option initialization.
