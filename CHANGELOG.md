@@ -23,6 +23,9 @@ Versions use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Optional byte-oriented regex module with ordered Pike VM matching, captures,
+  greedy/lazy bounded repetition, ASCII classes, replacement/splitting, a log
+  parsing recipe, allocation-failure tests and sanitizer fuzz coverage.
 - Cookbook recipes for streaming CSV totals, a validated JSON struct round
   trip, and an aligned counting allocator with live/peak byte tracking.
 - Calendar day/month arithmetic, ISO weeks, precise instant comparison, duration

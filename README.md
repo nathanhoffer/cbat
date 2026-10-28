@@ -100,6 +100,11 @@ Options: `-DCBAT_WERROR=ON`, `-DCBAT_SANITIZE=ON` (ASan+UBSan),
 
 ## Install
 
+Optional tier-2 modules have separate headers. `cbat/regex.h` provides a
+byte-oriented Pike VM regex engine; disable its compiled library source with
+`-DCBAT_WITH_REGEX=OFF`. For the single header, define `CBAT_WITH_REGEX 0`
+before including it to omit regex declarations and implementation.
+
 Build and install to a prefix you own (no administrator access required):
 
 ```bash

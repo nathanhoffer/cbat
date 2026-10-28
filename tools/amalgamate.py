@@ -27,7 +27,8 @@ def read_modules():
     match = re.search(r"set\(CBAT_MODULES\s+(.*?)\)", cmake, re.S)
     if not match:
         sys.exit("amalgamate: could not find set(CBAT_MODULES ...) in CMakeLists.txt")
-    return match.group(1).split()
+    optional = re.search(r"set\(CBAT_OPTIONAL_MODULES\s+(.*?)\)", cmake, re.S)
+    return match.group(1).split(), optional.group(1).split() if optional else []
 
 
 def strip_local_includes(text):
@@ -41,7 +42,8 @@ def main():
     parser.add_argument("--output", default=str(ROOT / "dist" / "cbat.h"))
     args = parser.parse_args()
 
-    modules = read_modules()
+    modules, optional = read_modules()
+    modules += optional
     version = re.search(
         r'#define CBAT_VERSION_STRING "([^"]+)"',
         (ROOT / "include" / "cbat" / "base.h").read_text(encoding="utf-8"),
@@ -55,12 +57,20 @@ def main():
             if block not in feature_blocks:
                 feature_blocks.append(block)
         text = FEATURE_REGION.sub("", text)
-        sources.append(f"/* ==== src/{module}.c ==== */\n" + strip_local_includes(text))
+        block = f"/* ==== src/{module}.c ==== */\n" + strip_local_includes(text)
+        if module in optional:
+            flag = "CBAT_WITH_" + module.upper()
+            block = f"#if !defined({flag}) || {flag}\n" + block + "#endif\n"
+        sources.append(block)
 
     headers = []
     for module in modules:
         text = (ROOT / "include" / "cbat" / f"{module}.h").read_text(encoding="utf-8")
-        headers.append(f"/* ==== include/cbat/{module}.h ==== */\n" + strip_local_includes(text))
+        block = f"/* ==== include/cbat/{module}.h ==== */\n" + strip_local_includes(text)
+        if module in optional:
+            flag = "CBAT_WITH_" + module.upper()
+            block = f"#if !defined({flag}) || {flag}\n" + block + "#endif\n"
+        headers.append(block)
 
     license_text = (ROOT / "LICENSE").read_text(encoding="utf-8").strip()
     out = []

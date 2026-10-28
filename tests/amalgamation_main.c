@@ -40,5 +40,13 @@ int main(void) {
         return 1;
     }
     cbat_heap_free(heap);
+#if !defined(CBAT_WITH_REGEX) || CBAT_WITH_REGEX
+    {
+        CBatRegex *regex = NULL;
+        if (cbat_regex_compile("(ab)+", 0, &regex, NULL) != CBAT_OK) return 1;
+        if (!cbat_regex_is_match(regex, "abab")) { cbat_regex_free(regex); return 1; }
+        cbat_regex_free(regex);
+    }
+#endif
     return 0;
 }

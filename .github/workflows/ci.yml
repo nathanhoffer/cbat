@@ -21,7 +21,7 @@ jobs:
           mkdir -p findings
           cp -R fuzz/corpus build/corpus
           failed=0
-          for target in json csv datetime base64 utf8; do
+          for target in json csv datetime base64 utf8 regex; do
             mkdir -p findings/$target
             build/fuzz/fuzz_$target build/corpus/$target -max_total_time=60 -max_len=4096 -artifact_prefix=findings/$target/ > findings/$target.log 2>&1 || failed=1
             tail -n 8 findings/$target.log
@@ -40,6 +40,16 @@ jobs:
       - uses: actions/checkout@v5
       - run: python3 -m unittest discover -s tools/tests
       - run: python3 tools/gen_api_docs.py --check
+
+  optional-off:
+    name: Optional modules disabled
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - run: cmake -S . -B build -DCMAKE_C_COMPILER=clang -DCBAT_WITH_REGEX=OFF -DCBAT_WERROR=ON
+      - run: cmake --build build --parallel
+      - run: ctest --test-dir build --output-on-failure
+      - run: clang -std=c99 -Wall -Wextra -Werror -DCBAT_WITH_REGEX=0 -I build/dist tests/amalgamation_main.c -lm -o build/single-minimal && build/single-minimal
 
   desktop:
     name: ${{ matrix.name }}
