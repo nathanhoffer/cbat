@@ -41,7 +41,7 @@ jobs:
             cc: clang-cl
             flags: -T ClangCL
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Configure (Unix)
         if: runner.os != 'Windows'
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_COMPILER=${{ matrix.cc }} -DCBAT_WERROR=ON ${{ matrix.flags }}
@@ -57,7 +57,7 @@ jobs:
     name: iOS (cross-compile)
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Configure
         run: >
           cmake -S . -B build -G Xcode
@@ -74,7 +74,7 @@ jobs:
       matrix:
         abi: [arm64-v8a, x86_64]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Configure
         run: >
           cmake -S . -B build
@@ -88,14 +88,14 @@ jobs:
     name: Single header
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Generate dist/cbat.h
         run: python3 tools/amalgamate.py --output dist/cbat.h
       - name: Compile as C99 with strict warnings
         run: |
           gcc -std=c99 -Wall -Wextra -Wpedantic -Werror -Idist tests/amalgamation_main.c -lm -o amalgamation
           ./amalgamation
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: cbat-single-header
           path: dist/cbat.h

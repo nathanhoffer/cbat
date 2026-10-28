@@ -50,12 +50,12 @@ CBAT_TEST(test_many_keys_and_insertion_order) {
     int expected = 0;
     CBAT_REQUIRE_NOT_NULL(d);
     for (i = 0; i < 5000; i++) {
-        sprintf(key, "key-%d", i);
+        snprintf(key, sizeof key, "key-%d", i);
         CBAT_REQUIRE_OK(CBAT_DICT_SET(d, key, int, i));
     }
     CBAT_CHECK_EQ_SIZE(cbat_dict_length(d), 5000);
     for (i = 0; i < 5000; i += 97) {
-        sprintf(key, "key-%d", i);
+        snprintf(key, sizeof key, "key-%d", i);
         CBAT_REQUIRE_EQ_INT(CBAT_DICT_GET(d, key, int, -1), i);
     }
     while (cbat_dict_next(d, &it, &k, &v)) {
@@ -73,11 +73,11 @@ CBAT_TEST(test_remove_and_reinsert) {
     int out = 0;
     CBAT_REQUIRE_NOT_NULL(d);
     for (i = 0; i < 1000; i++) {
-        sprintf(key, "k%d", i);
+        snprintf(key, sizeof key, "k%d", i);
         CBAT_REQUIRE_OK(CBAT_DICT_SET(d, key, int, i));
     }
     for (i = 0; i < 1000; i += 2) {
-        sprintf(key, "k%d", i);
+        snprintf(key, sizeof key, "k%d", i);
         CBAT_REQUIRE_OK(cbat_dict_remove(d, key, NULL));
     }
     CBAT_CHECK_EQ_SIZE(cbat_dict_length(d), 500);
@@ -86,13 +86,13 @@ CBAT_TEST(test_remove_and_reinsert) {
     CBAT_CHECK_EQ_INT(out, 1);
     /* Churn: many insert/remove cycles must not grow without bound or lose keys. */
     for (i = 0; i < 20000; i++) {
-        sprintf(key, "temp%d", i % 7);
+        snprintf(key, sizeof key, "temp%d", i % 7);
         CBAT_REQUIRE_OK(CBAT_DICT_SET(d, key, int, i));
         CBAT_REQUIRE_OK(cbat_dict_remove(d, key, NULL));
     }
     CBAT_CHECK_EQ_SIZE(cbat_dict_length(d), 499);
     for (i = 3; i < 1000; i += 2) {
-        sprintf(key, "k%d", i);
+        snprintf(key, sizeof key, "k%d", i);
         CBAT_REQUIRE_EQ_INT(CBAT_DICT_GET(d, key, int, -1), i);
     }
     cbat_dict_free(d);
@@ -187,7 +187,7 @@ CBAT_TEST(test_dict_in_arena) {
     d = cbat_dict_new_with(sizeof(int), cbat_arena_allocator(arena));
     CBAT_REQUIRE_NOT_NULL(d);
     for (i = 0; i < 300; i++) {
-        sprintf(key, "%d", i);
+        snprintf(key, sizeof key, "%d", i);
         CBAT_REQUIRE_OK(CBAT_DICT_SET(d, key, int, i));
     }
     CBAT_CHECK_EQ_INT(CBAT_DICT_GET(d, "299", int, -1), 299);
@@ -208,14 +208,14 @@ CBAT_TEST(test_out_of_memory) {
             continue;
         }
         for (i = 0; i < 50 && err == CBAT_OK; i++) {
-            sprintf(key, "%d", i);
+            snprintf(key, sizeof key, "%d", i);
             err = CBAT_DICT_SET(d, key, int, i);
         }
         cbat_test_stop_failing_allocations();
         CBAT_CHECK_ERR(err, CBAT_ERR_NO_MEMORY);
         /* Everything inserted before the failure is still there. */
         for (i = i - 2; i >= 0; i--) {
-            sprintf(key, "%d", i);
+            snprintf(key, sizeof key, "%d", i);
             CBAT_CHECK_EQ_INT(CBAT_DICT_GET(d, key, int, -1), i);
         }
         CBAT_CHECK_OK(CBAT_DICT_SET(d, "after", int, 1));
