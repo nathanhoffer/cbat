@@ -80,6 +80,43 @@ CBAT_API bool cbat_dict_next(const CBatDict *dict, size_t *iterator, const char 
  */
 CBAT_API CBatError cbat_dict_keys(const CBatDict *dict, CBatList **out);
 
+/**
+ * Returns a borrowed existing value, or inserts a copy of value first.
+ * out must be non-NULL. Ownership transfers only if a new value is inserted.
+ * Outputs unchanged on error; value may be NULL for zero-sized values.
+ */
+CBAT_API CBatError cbat_dict_get_or_insert(CBatDict *dict, const char *key, const void *value, void **out);
+
+/**
+ * Adds delta to an int64_t counter, starting missing keys at zero.
+ * Requires sizeof(int64_t) values and no destructor (otherwise ERR_TYPE).
+ * ERR_OVERFLOW leaves the value unchanged. new_value may be NULL.
+ */
+CBAT_API CBatError cbat_dict_increment(CBatDict *dict, const char *key, int64_t delta, int64_t *new_value);
+
+/**
+ * Up to limit keys sorted by int64_t value, descending (stable on ties).
+ * ERR_TYPE unless value_size is sizeof(int64_t). limit 0 gives an empty list.
+ * The new list owns its storage, but keys are borrowed until dict mutation.
+ */
+CBAT_API CBatError cbat_dict_most_common(const CBatDict *dict, size_t limit, CBatList **out);
+
+/**
+ * Copies keys and value bytes using the source allocator. The new dict has
+ * no value destructor: pointed-to resources are borrowed, not cloned.
+ * Outputs unchanged on failure; free the new dict with cbat_dict_free.
+ */
+CBAT_API CBatError cbat_dict_copy(const CBatDict *dict, CBatDict **out);
+
+/**
+ * Copies value bytes from other, keeping existing key order then appending
+ * new keys. Sizes must match (ERR_TYPE). Self-update is a no-op.
+ * To avoid transferring shared ownership, destination must have no destructor
+ * (ERR_UNSUPPORTED otherwise). Pointed-to resources remain borrowed.
+ * An allocation failure may leave earlier entries applied; both dicts stay valid.
+ */
+CBAT_API CBatError cbat_dict_update(CBatDict *dict, const CBatDict *other);
+
 /* ---- Typed convenience macros (scalar and pointer types) ---------------- */
 
 /** CBAT_DICT_SET(dict, "k", int, 5) -> CBatError */

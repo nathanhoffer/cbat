@@ -6,72 +6,55 @@
  *   collections.Counter(text.split()).most_common(3).
  *
  * SOLUTION
- *   Split on whitespace, lower-case each word, count with a CBatDict of
- *   ints, then sort (word, count) pairs by count.
+ *   Split on whitespace, normalize each word, then use an int64_t dict with
+ *   cbat_dict_increment() and cbat_dict_most_common().
  *
  * DISCUSSION
- *   CBatDict keeps insertion order, so words with equal counts stay in the
- *   order they first appeared - cbat_sort is stable, just like sorted().
- *   CBAT_DICT_GET with a fallback of 0 is the C spelling of
- *   counts.get(word, 0).
+ *   Counter arithmetic reports overflow. Ranking is stable, so tied words
+ *   keep their first-occurrence order. The returned key list borrows its
+ *   strings from the dict: finish using it before modifying/freeing counts.
  */
 #include <stdio.h>
 
 #include "cbat/cbat.h"
-
-typedef struct WordCount {
-    const char *word; /* borrowed from the dict */
-    int count;
-} WordCount;
-
-static int by_count_descending(const void *a, const void *b) {
-    const WordCount *x = (const WordCount *)a;
-    const WordCount *y = (const WordCount *)b;
-    return (y->count > x->count) - (y->count < x->count);
-}
 
 int main(void) {
     const char *text =
         "It was the best of times, it was the worst of times, "
         "it was the age of wisdom, it was the age of foolishness";
     CBatList *words = NULL;
-    CBatDict *counts = cbat_dict_new(sizeof(int));
-    CBatList *pairs = cbat_list_new(sizeof(WordCount));
-    size_t it = 0;
-    const char *word;
-    void *value;
+    CBatDict *counts = cbat_dict_new(sizeof(int64_t));
+    CBatList *top = NULL;
+    CBatError err = CBAT_ERR_NO_MEMORY;
     size_t i;
 
-    if (counts == NULL || pairs == NULL ||
-        cbat_string_split_whitespace(text, &words) != CBAT_OK) {
-        fprintf(stderr, "out of memory\n");
-        return 1;
-    }
+    if (counts == NULL) goto cleanup;
+    err = cbat_string_split_whitespace(text, &words);
+    if (err != CBAT_OK) goto cleanup;
 
     CBAT_LIST_FOREACH(CBatString *, entry, words) {
         CBatString *w = *entry;
         cbat_string_to_lower(w);
-        cbat_string_replace(w, ",", "", NULL); /* strip punctuation */
-        CBAT_DICT_SET(counts, cbat_string_cstr(w), int,
-                      CBAT_DICT_GET(counts, cbat_string_cstr(w), int, 0) + 1);
+        err = cbat_string_replace(w, ",", "", NULL);
+        if (err != CBAT_OK) goto cleanup;
+        err = cbat_dict_increment(counts, cbat_string_cstr(w), 1, NULL);
+        if (err != CBAT_OK) goto cleanup;
     }
 
-    while (cbat_dict_next(counts, &it, &word, &value)) {
-        WordCount pair;
-        pair.word = word;
-        pair.count = *(int *)value;
-        cbat_list_push(pairs, &pair);
-    }
-    cbat_list_sort(pairs, by_count_descending);
+    err = cbat_dict_most_common(counts, 3, &top);
+    if (err != CBAT_OK) goto cleanup;
 
     printf("Top 3 words:\n");
-    for (i = 0; i < 3 && i < cbat_list_length(pairs); i++) {
-        WordCount *pair = (WordCount *)cbat_list_get(pairs, i);
-        printf("  %-6s %d\n", pair->word, pair->count);
+    for (i = 0; i < cbat_list_length(top); i++) {
+        const char *word = CBAT_LIST_GET(top, const char *, i);
+        const int64_t *count = (const int64_t *)cbat_dict_get(counts, word);
+        printf("  %-6s %lld\n", word, (long long)*count);
     }
 
-    cbat_list_free(pairs);
+cleanup:
+    if (err != CBAT_OK) fprintf(stderr, "word frequency: %s\n", cbat_error_str(err));
+    cbat_list_free(top);
     cbat_dict_free(counts);
     cbat_list_free(words);
-    return 0;
+    return err == CBAT_OK ? 0 : 1;
 }

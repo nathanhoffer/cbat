@@ -119,8 +119,12 @@ static CBatError cbat__set_build(const CBatSet *a, const CBatSet *b, CBatSet **o
     case 1: /* intersection */
         err = cbat__set_add_filtered(result, a, b, true, true);
         break;
-    default: /* difference */
+    case 2: /* difference */
         err = cbat__set_add_filtered(result, a, b, true, false);
+        break;
+    default: /* symmetric difference */
+        err = cbat__set_add_filtered(result, a, b, true, false);
+        if (err == CBAT_OK) err = cbat__set_add_filtered(result, b, a, true, false);
         break;
     }
     if (err != CBAT_OK) {
@@ -141,6 +145,22 @@ CBatError cbat_set_intersection(const CBatSet *a, const CBatSet *b, CBatSet **ou
 
 CBatError cbat_set_difference(const CBatSet *a, const CBatSet *b, CBatSet **out) {
     return cbat__set_build(a, b, out, 2);
+}
+
+CBatError cbat_set_copy(const CBatSet *set, CBatSet **out) {
+    CBatSet *copy;
+    CBatError err;
+    if (set == NULL || out == NULL) return CBAT_ERR_INVALID_ARGUMENT;
+    copy = cbat_set_new_with(set->allocator);
+    if (copy == NULL) return CBAT_ERR_NO_MEMORY;
+    err = cbat__set_add_filtered(copy, set, NULL, false, false);
+    if (err != CBAT_OK) { cbat_set_free(copy); return err; }
+    *out = copy;
+    return CBAT_OK;
+}
+
+CBatError cbat_set_symmetric_difference(const CBatSet *a, const CBatSet *b, CBatSet **out) {
+    return cbat__set_build(a, b, out, 3);
 }
 
 bool cbat_set_is_subset(const CBatSet *a, const CBatSet *b) {

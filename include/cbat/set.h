@@ -49,6 +49,12 @@ CBAT_API CBatError cbat_set_intersection(const CBatSet *a, const CBatSet *b, CBa
 /** New set with the items of `a` that are not in `b`. */
 CBAT_API CBatError cbat_set_difference(const CBatSet *a, const CBatSet *b, CBatSet **out);
 
+/** Independent copy of owned keys, using the source allocator. Outputs unchanged on error. */
+CBAT_API CBatError cbat_set_copy(const CBatSet *set, CBatSet **out);
+
+/** Items in exactly one set: a-only items then b-only items, in insertion order. */
+CBAT_API CBatError cbat_set_symmetric_difference(const CBatSet *a, const CBatSet *b, CBatSet **out);
+
 /** True when every item of `a` is in `b`. */
 CBAT_API bool cbat_set_is_subset(const CBatSet *a, const CBatSet *b);
 

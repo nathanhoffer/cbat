@@ -20,6 +20,8 @@ Versions use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Dictionary Counter helpers (`increment`, stable `most_common`),
+  get-or-insert, shallow copy/update, set copy and symmetric difference.
 - `CBatMap` with fixed-size keys/values, integer-key convenience macros,
   insertion-order iteration, custom hashing/equality, and ownership callbacks.
 - Opt-in libFuzzer targets for JSON, CSV, ISO dates, Base64 and UTF-8, with

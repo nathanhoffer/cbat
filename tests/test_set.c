@@ -104,6 +104,62 @@ CBAT_TEST(test_subset_and_equals) {
     cbat_set_free(t);
 }
 
+CBAT_TEST(test_copy_and_symmetric_difference) {
+    const char *xs[] = {"a", "b", "c"};
+    const char *ys[] = {"b", "d"};
+    CBatSet *a = make_set(xs, 3), *b = make_set(ys, 2), *copy = NULL, *result = NULL;
+    size_t it = 0;
+    const char *item;
+    CBAT_REQUIRE_NOT_NULL(a); CBAT_REQUIRE_NOT_NULL(b);
+    CBAT_REQUIRE_OK(cbat_set_copy(a, &copy));
+    CBAT_CHECK(cbat_set_equals(copy, a));
+    CBAT_REQUIRE_OK(cbat_set_remove(copy, "a"));
+    CBAT_CHECK(cbat_set_contains(a, "a"));
+    CBAT_REQUIRE_OK(cbat_set_symmetric_difference(a, b, &result));
+    CBAT_CHECK_EQ_SIZE(cbat_set_length(result), 3);
+    CBAT_REQUIRE(cbat_set_next(result, &it, &item)); CBAT_CHECK_EQ_STR(item, "a");
+    CBAT_REQUIRE(cbat_set_next(result, &it, &item)); CBAT_CHECK_EQ_STR(item, "c");
+    CBAT_REQUIRE(cbat_set_next(result, &it, &item)); CBAT_CHECK_EQ_STR(item, "d");
+    cbat_set_free(result); result = NULL;
+    CBAT_REQUIRE_OK(cbat_set_symmetric_difference(a, a, &result));
+    CBAT_CHECK_EQ_SIZE(cbat_set_length(result), 0);
+    cbat_set_free(result); result = NULL;
+    CBAT_CHECK_ERR(cbat_set_copy(NULL, &result), CBAT_ERR_INVALID_ARGUMENT);
+    CBAT_CHECK_ERR(cbat_set_copy(a, NULL), CBAT_ERR_INVALID_ARGUMENT);
+    CBAT_CHECK_ERR(cbat_set_symmetric_difference(NULL, b, &result), CBAT_ERR_INVALID_ARGUMENT);
+    CBAT_CHECK_ERR(cbat_set_symmetric_difference(a, NULL, &result), CBAT_ERR_INVALID_ARGUMENT);
+    CBAT_CHECK_ERR(cbat_set_symmetric_difference(a, b, NULL), CBAT_ERR_INVALID_ARGUMENT);
+    CBAT_CHECK_NULL(result);
+    cbat_set_free(copy); cbat_set_free(b); cbat_set_free(a);
+}
+
+CBAT_TEST(test_copy_and_symmetric_difference_oom) {
+    const char *xs[] = {"a", "b", "c"}, *ys[] = {"b", "d"};
+    CBatSet *a = make_set(xs, 3), *b = make_set(ys, 2);
+    size_t allowed;
+    bool copied = false, combined = false;
+    CBAT_REQUIRE_NOT_NULL(a); CBAT_REQUIRE_NOT_NULL(b);
+    for (allowed = 0; allowed < 40; allowed++) {
+        CBatSet *result = NULL;
+        CBatError err;
+        cbat_test_fail_allocations_after(allowed);
+        err = cbat_set_copy(a, &result);
+        cbat_test_stop_failing_allocations();
+        if (err == CBAT_OK) { copied = true; CBAT_CHECK(cbat_set_equals(a, result)); }
+        else { CBAT_CHECK_ERR(err, CBAT_ERR_NO_MEMORY); CBAT_CHECK_NULL(result); }
+        cbat_set_free(result); result = NULL;
+        cbat_test_fail_allocations_after(allowed);
+        err = cbat_set_symmetric_difference(a, b, &result);
+        cbat_test_stop_failing_allocations();
+        if (err == CBAT_OK) { combined = true; CBAT_CHECK_EQ_SIZE(cbat_set_length(result), 3); }
+        else { CBAT_CHECK_ERR(err, CBAT_ERR_NO_MEMORY); CBAT_CHECK_NULL(result); }
+        cbat_set_free(result);
+        if (copied && combined) break;
+    }
+    CBAT_CHECK(copied && combined);
+    cbat_set_free(b); cbat_set_free(a);
+}
+
 CBAT_TEST(test_out_of_memory) {
     size_t n;
     const char *xs[] = {"a", "b", "c", "d", "e"};
@@ -132,6 +188,8 @@ static const CBatTestCase tests[] = {
     CBAT_TEST_ENTRY(test_iteration_order_and_items),
     CBAT_TEST_ENTRY(test_union_intersection_difference),
     CBAT_TEST_ENTRY(test_subset_and_equals),
+    CBAT_TEST_ENTRY(test_copy_and_symmetric_difference),
+    CBAT_TEST_ENTRY(test_copy_and_symmetric_difference_oom),
     CBAT_TEST_ENTRY(test_out_of_memory),
 };
 

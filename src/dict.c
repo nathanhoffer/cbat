@@ -12,6 +12,7 @@
 #include <string.h>
 
 #include "cbat/hash.h"
+#include "cbat/sort.h"
 
 #define CBAT__DICT_EMPTY 0u
 #define CBAT__DICT_TOMBSTONE SIZE_MAX
@@ -390,5 +391,109 @@ CBatError cbat_dict_keys(const CBatDict *dict, CBatList **out) {
         cbat_list_push(keys, &key); /* cannot fail: reserved */
     }
     *out = keys;
+    return CBAT_OK;
+}
+
+CBatError cbat_dict_get_or_insert(CBatDict *dict, const char *key, const void *value, void **out) {
+    void *stored;
+    CBatError err;
+    if (dict == NULL || key == NULL || out == NULL ||
+        (value == NULL && dict->value_size != 0)) return CBAT_ERR_INVALID_ARGUMENT;
+    stored = cbat_dict_get(dict, key);
+    if (stored == NULL) {
+        err = cbat_dict_set(dict, key, value);
+        if (err != CBAT_OK) return err;
+        stored = cbat_dict_get(dict, key);
+    }
+    *out = stored;
+    return CBAT_OK;
+}
+
+CBatError cbat_dict_increment(CBatDict *dict, const char *key, int64_t delta, int64_t *new_value) {
+    int64_t old = 0, next;
+    void *stored;
+    CBatError err;
+    if (dict == NULL || key == NULL) return CBAT_ERR_INVALID_ARGUMENT;
+    if (dict->value_size != sizeof(int64_t) || dict->destructor != NULL) return CBAT_ERR_TYPE;
+    stored = cbat_dict_get(dict, key);
+    if (stored != NULL) memcpy(&old, stored, sizeof(old));
+    if ((delta > 0 && old > INT64_MAX - delta) ||
+        (delta < 0 && old < INT64_MIN - delta)) return CBAT_ERR_OVERFLOW;
+    next = old + delta;
+    err = cbat_dict_set(dict, key, &next);
+    if (err == CBAT_OK && new_value != NULL) *new_value = next;
+    return err;
+}
+
+typedef struct cbat__dict_count {
+    const char *key;
+    int64_t count;
+} cbat__dict_count;
+
+static int cbat__dict_count_descending(const void *a, const void *b) {
+    int64_t x = ((const cbat__dict_count *)a)->count;
+    int64_t y = ((const cbat__dict_count *)b)->count;
+    return (x < y) - (x > y);
+}
+
+CBatError cbat_dict_most_common(const CBatDict *dict, size_t limit, CBatList **out) {
+    CBatList *pairs = NULL;
+    CBatList *keys;
+    size_t it = 0, i;
+    const char *key;
+    void *value;
+    CBatError err = CBAT_OK;
+    if (dict == NULL || out == NULL) return CBAT_ERR_INVALID_ARGUMENT;
+    if (dict->value_size != sizeof(int64_t)) return CBAT_ERR_TYPE;
+    keys = cbat_list_new(sizeof(const char *));
+    if (keys == NULL) return CBAT_ERR_NO_MEMORY;
+    limit = CBAT_MIN(limit, dict->length);
+    if (limit != 0) {
+        pairs = cbat_list_new(sizeof(cbat__dict_count));
+        if (pairs == NULL) err = CBAT_ERR_NO_MEMORY;
+        if (err == CBAT_OK) err = cbat_list_reserve(pairs, dict->length);
+        while (err == CBAT_OK && cbat_dict_next(dict, &it, &key, &value)) {
+            cbat__dict_count pair;
+            pair.key = key;
+            memcpy(&pair.count, value, sizeof(pair.count));
+            err = cbat_list_push(pairs, &pair);
+        }
+        if (err == CBAT_OK) err = cbat_list_sort(pairs, cbat__dict_count_descending);
+        if (err == CBAT_OK) err = cbat_list_reserve(keys, limit);
+        for (i = 0; i < limit && err == CBAT_OK; i++) {
+            cbat__dict_count *pair = (cbat__dict_count *)cbat_list_get(pairs, i);
+            err = cbat_list_push(keys, &pair->key);
+        }
+    }
+    cbat_list_free(pairs);
+    if (err != CBAT_OK) { cbat_list_free(keys); return err; }
+    *out = keys;
+    return CBAT_OK;
+}
+
+CBatError cbat_dict_update(CBatDict *dict, const CBatDict *other) {
+    size_t it = 0;
+    const char *key;
+    void *value;
+    if (dict == NULL || other == NULL) return CBAT_ERR_INVALID_ARGUMENT;
+    if (dict == other) return CBAT_OK;
+    if (dict->value_size != other->value_size) return CBAT_ERR_TYPE;
+    if (dict->destructor != NULL) return CBAT_ERR_UNSUPPORTED;
+    while (cbat_dict_next(other, &it, &key, &value)) {
+        CBatError err = cbat_dict_set(dict, key, value);
+        if (err != CBAT_OK) return err;
+    }
+    return CBAT_OK;
+}
+
+CBatError cbat_dict_copy(const CBatDict *dict, CBatDict **out) {
+    CBatDict *copy;
+    CBatError err;
+    if (dict == NULL || out == NULL) return CBAT_ERR_INVALID_ARGUMENT;
+    copy = cbat_dict_new_with(dict->value_size, dict->allocator);
+    if (copy == NULL) return CBAT_ERR_NO_MEMORY;
+    err = cbat_dict_update(copy, dict);
+    if (err != CBAT_OK) { cbat_dict_free(copy); return err; }
+    *out = copy;
     return CBAT_OK;
 }
