@@ -23,6 +23,8 @@ Versions use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Percent/form encoding, strict decoding, URI-reference parsing with IPv6
+  literals and validated ports, and owned query dictionaries with binary values.
 - `CBatBytes` binary buffers and `CBatByteReader` checked cursors, explicit
   little/big-endian integers and IEEE floats, binary file helpers, and a BMP recipe.
 - `CBatHeap` min-priority queue, allocation-free push/pop combination,

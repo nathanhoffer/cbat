@@ -36,6 +36,7 @@ set(CBAT_MODULES
     fs
     file
     bytes
+    url
     encoding
     csv
     json

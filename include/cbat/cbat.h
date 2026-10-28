@@ -22,6 +22,7 @@
 #include "cbat/fs.h"
 #include "cbat/file.h"
 #include "cbat/bytes.h"
+#include "cbat/url.h"
 #include "cbat/encoding.h"
 #include "cbat/csv.h"
 #include "cbat/json.h"
