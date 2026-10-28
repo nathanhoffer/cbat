@@ -1,6 +1,7 @@
 #include "cbat/ui.h"
 #include "cbat/test.h"
 #include <string.h>
+#include <limits.h>
 
 CBAT_TEST(test_click_once_and_owned_commands) {
     CBatUi *ui = cbat_ui_new(NULL, NULL);
@@ -161,7 +162,37 @@ CBAT_TEST(test_text_edit_and_state_oom) {
     }
     CBAT_CHECK(succeeded);
 }
+CBAT_TEST(test_same_line_and_integer_slider_keys) {
+    CBatUi *ui=cbat_ui_new(NULL,NULL);
+    CBatUiInput input={0};
+    float width=100,first_y=-1,second_y=-2,first_x=0,second_x=0;
+    int value=5;size_t i;
+    CBAT_REQUIRE_NOT_NULL(ui);
+    cbat_ui_begin_frame(ui,NULL,300,200);cbat_ui_row(ui,1,&width,30);
+    (void)cbat_ui_button(ui,"first");cbat_ui_same_line(ui);(void)cbat_ui_button(ui,"second");cbat_ui_end_frame(ui);
+    for(i=0;i<cbat_ui_command_count(ui);i++){
+        const CBatUiCommand *command=cbat_ui_command(ui,i);
+        if(command->type!=CBAT_UI_DRAW_TEXT)continue;
+        if(strcmp(command->text,"first")==0){first_y=command->rect.y;first_x=command->rect.x;}
+        if(strcmp(command->text,"second")==0){second_y=command->rect.y;second_x=command->rect.x;}
+    }
+    CBAT_CHECK(first_y>=0);CBAT_CHECK_NEAR(first_y,second_y,0);CBAT_CHECK(second_x>first_x+100);
+    input.pointer_down=true;input.pointer_x=150;input.pointer_y=20;
+    cbat_ui_begin_frame(ui,&input,300,200);CBAT_CHECK(!cbat_ui_slider_int(ui,"integer",&value,0,10));cbat_ui_end_frame(ui);
+    input.pointer_down=false;input.keys_pressed=CBAT_UI_KEY_RIGHT;
+    cbat_ui_begin_frame(ui,&input,300,200);CBAT_CHECK(cbat_ui_slider_int(ui,"integer",&value,0,10));cbat_ui_end_frame(ui);CBAT_CHECK_EQ_INT(value,6);
+    input.keys_pressed=CBAT_UI_KEY_LEFT;
+    cbat_ui_begin_frame(ui,&input,300,200);CBAT_CHECK(cbat_ui_slider_int(ui,"integer",&value,0,10));cbat_ui_end_frame(ui);CBAT_CHECK_EQ_INT(value,5);
+    input.keys_pressed=0;input.pointer_down=true;input.pointer_x=20;
+    cbat_ui_begin_frame(ui,&input,300,200);(void)cbat_ui_slider_int(ui,"extreme",&value,INT_MIN,INT_MAX);cbat_ui_end_frame(ui);
+    input.pointer_x=500;
+    cbat_ui_begin_frame(ui,&input,300,200);CBAT_CHECK(cbat_ui_slider_int(ui,"extreme",&value,INT_MIN,INT_MAX));cbat_ui_end_frame(ui);CBAT_CHECK_EQ_INT(value,INT_MAX);
+    input.pointer_x=-100;
+    cbat_ui_begin_frame(ui,&input,300,200);CBAT_CHECK(cbat_ui_slider_int(ui,"extreme",&value,INT_MIN,INT_MAX));cbat_ui_end_frame(ui);CBAT_CHECK_EQ_INT(value,INT_MIN);
+    CBAT_CHECK_ERR(cbat_ui_error(ui),CBAT_OK);cbat_ui_free(ui);
+}
 static const CBatTestCase tests[] = {CBAT_TEST_ENTRY(test_click_once_and_owned_commands), CBAT_TEST_ENTRY(test_slider_and_utf8_editor),
     CBAT_TEST_ENTRY(test_windows_ids_layout_and_styles), CBAT_TEST_ENTRY(test_errors_oom_and_arena),
-    CBAT_TEST_ENTRY(test_scoped_ids_and_tab_focus), CBAT_TEST_ENTRY(test_text_edit_and_state_oom)};
+    CBAT_TEST_ENTRY(test_scoped_ids_and_tab_focus), CBAT_TEST_ENTRY(test_text_edit_and_state_oom),
+    CBAT_TEST_ENTRY(test_same_line_and_integer_slider_keys)};
 CBAT_TEST_MAIN("ui", tests)
