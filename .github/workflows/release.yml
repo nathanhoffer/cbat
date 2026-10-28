@@ -1,0 +1,36 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Verify tag matches the public version
+        shell: bash
+        run: |
+          version=$(python3 -c 'import pathlib,re; print(re.search(r"CBAT_VERSION_STRING \"([^\"]+)\"", pathlib.Path("include/cbat/base.h").read_text()).group(1))')
+          test "$GITHUB_REF_NAME" = "v$version"
+      - name: Build and test release sources
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCBAT_WERROR=ON
+          cmake --build build --parallel
+          ctest --test-dir build --output-on-failure
+          python3 tools/gen_api_docs.py --check
+      - name: Package
+        shell: bash
+        run: |
+          python3 tools/amalgamate.py --output dist/cbat.h
+          cc -std=c99 -Wall -Wextra -Wpedantic -Werror -Idist tests/amalgamation_main.c -lm -o build/amalgamation-release
+          build/amalgamation-release
+          git archive --format=zip --prefix="cbat-$GITHUB_REF_NAME/" HEAD -o dist/cbat-source.zip
+      - name: Publish release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/cbat.h dist/cbat-source.zip --verify-tag --generate-notes
