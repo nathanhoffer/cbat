@@ -35,6 +35,7 @@ For conventions and ownership rules, see [DESIGN.md](DESIGN.md).
 - [string](#string)
 - [test](#test)
 - [time](#time)
+- [ui](#ui)
 - [url](#url)
 
 ## args
@@ -3665,6 +3666,267 @@ CBAT_API CBatError cbat_datetime_format(const CBatDateTime *dt, const char *form
 
 Formats with strftime() codes (%Y-%m-%d %H:%M:%S, %A, %B, ...). Names of
 days and months follow the C locale.
+
+
+## ui
+
+Source: [`cbat/ui.h`](../include/cbat/ui.h)
+
+```text
+cbat/ui.h - renderer-independent immediate-mode UI. MIT License.
+Include explicitly; optional CMake CBAT_WITH_UI (default ON). Coordinates
+are logical pixels, origin top left. Submit widgets in paint/hit-test order;
+avoid overlapping interactive rectangles. Objects require external locking.
+Frame/void/widget APIs latch errors: inspect cbat_ui_error after end_frame.
+Commands are discarded on frame failure. Values successfully changed before
+a later error remain changed. No fonts or platform event loop are included.
+```
+
+```c
+typedef struct CBatUi CBatUi;
+```
+
+```c
+typedef struct CBatUiRect { float x, y, width, height; } CBatUiRect;
+```
+
+Logical pixel rectangle.
+
+```c
+typedef struct CBatUiColor { uint8_t r, g, b, a; } CBatUiColor;
+```
+
+Straight-alpha sRGB color, channels 0..255.
+
+```c
+typedef float (*CBatUiMeasureText)(void *context, const char *text, size_t length, float font_size);
+```
+
+Host text width callback; length bytes, font size in pixels. Must return finite nonnegative width.
+
+```c
+typedef struct CBatUiInput {
+    float pointer_x, pointer_y;
+    bool pointer_down;
+    float scroll_x, scroll_y;
+    char text[32];
+    uint32_t keys_pressed;
+} CBatUiInput;
+```
+
+Snapshot once per frame. text is NUL-terminated UTF-8 (at most 31 bytes),
+no newlines; key bits are edge/repeat events, not held-state bits. Scroll
+deltas are pixels (positive moves toward later content).
+
+```c
+typedef enum CBatUiCommandType {
+    CBAT_UI_DRAW_RECT, CBAT_UI_DRAW_RECT_OUTLINE, CBAT_UI_DRAW_TEXT,
+    CBAT_UI_DRAW_LINE, CBAT_UI_CLIP_PUSH, CBAT_UI_CLIP_POP
+} CBatUiCommandType;
+```
+
+```c
+typedef struct CBatUiCommand {
+    CBatUiCommandType type;
+    CBatUiRect rect;
+    CBatUiColor color;
+    float corner_radius, thickness, font_size;
+    const char *text;
+    size_t text_length;
+} CBatUiCommand;
+```
+
+Flat draw command. Line endpoints: (x,y) and (x+width,y+height).
+Clip pushes intersect the previous clip. Text is owned by UI until next
+begin_frame/free; command pointers may move while submitting more widgets.
+
+```c
+typedef struct CBatUiStyle {
+    CBatUiColor background, panel, text, accent, border;
+    float padding, spacing, font_size, corner_radius;
+} CBatUiStyle;
+```
+
+Colors and nonnegative pixel metrics (font_size > 0).
+
+```c
+CBAT_API CBatUi *cbat_ui_new(CBatUiMeasureText measure, void *measure_context);
+```
+
+New UI, NULL on OOM. NULL measure uses an approximate 0.6*font_size per UTF-8 code point.
+
+```c
+CBAT_API CBatUi *cbat_ui_new_with(CBatUiMeasureText measure, void *measure_context, const CBatAllocator *allocator);
+```
+
+Same with retained allocator (NULL = default); must outlive UI.
+
+```c
+CBAT_API void cbat_ui_free(CBatUi *ui);
+```
+
+Frees UI/state/commands/text; NULL ignored.
+
+```c
+CBAT_API void cbat_ui_begin_frame(CBatUi *ui, const CBatUiInput *input, float width, float height);
+```
+
+Starts frame, invalidating prior commands/text. NULL input = no events. Finite nonnegative viewport required.
+
+```c
+CBAT_API void cbat_ui_end_frame(CBatUi *ui);
+```
+
+Ends frame; unbalanced windows/IDs latch INVALID_ARGUMENT. Clears command list on any error.
+
+```c
+CBAT_API CBatError cbat_ui_error(const CBatUi *ui);
+```
+
+Latched frame error (INVALID_ARGUMENT for NULL).
+
+```c
+CBAT_API size_t cbat_ui_command_count(const CBatUi *ui);
+```
+
+Number of commands (0 for NULL). Read after successful end_frame.
+
+```c
+CBAT_API const CBatUiCommand *cbat_ui_command(const CBatUi *ui, size_t index);
+```
+
+Borrowed command or NULL if out of range.
+
+```c
+CBAT_API bool cbat_ui_wants_keyboard(const CBatUi *ui);
+```
+
+True while a submitted text field owns focus.
+
+```c
+CBAT_API bool cbat_ui_window_begin(CBatUi *ui, const char *title, CBatUiRect *rect);
+```
+
+Pushes draggable window layout; click left title marker to collapse.
+Always call window_end, even if false. rect is caller-owned and updated on drag.
+Windows nest at most 16 deep; title namespaces child IDs.
+
+```c
+CBAT_API void cbat_ui_window_end(CBatUi *ui);
+```
+
+Pops window/clip.
+
+```c
+CBAT_API void cbat_ui_row(CBatUi *ui, size_t columns, const float *widths, float height);
+```
+
+Repeating row of 1..64 columns; copies widths (NULL = all fill).
+Positive = fixed pixels, zero = auto widget width, negative = equal fill.
+height 0 uses default. New row starts below an incomplete previous row.
+
+```c
+CBAT_API void cbat_ui_same_line(CBatUi *ui);
+```
+
+Places next widget beside the previous widget, overriding row layout once.
+
+```c
+CBAT_API void cbat_ui_spacing(CBatUi *ui, float pixels);
+```
+
+Adds nonnegative vertical space.
+
+```c
+CBAT_API void cbat_ui_separator(CBatUi *ui);
+```
+
+Horizontal line occupying one row.
+
+```c
+CBAT_API void cbat_ui_push_id(CBatUi *ui, const char *id);
+```
+
+Pushes an ID namespace (64 deep maximum); labels must be unique within each namespace.
+
+```c
+CBAT_API void cbat_ui_push_id_int(CBatUi *ui, int64_t id);
+```
+
+Same with an integer ID.
+
+```c
+CBAT_API void cbat_ui_pop_id(CBatUi *ui);
+```
+
+Pops explicit ID namespace; cannot pop window's implicit namespace.
+
+```c
+CBAT_API void cbat_ui_label(CBatUi *ui, const char *text);
+```
+
+Text label. Copies text for frame lifetime.
+
+```c
+CBAT_API bool cbat_ui_button(CBatUi *ui, const char *label);
+```
+
+True once on release inside the button after pressing inside it.
+
+```c
+CBAT_API bool cbat_ui_checkbox(CBatUi *ui, const char *label, bool *value);
+```
+
+True if toggled on click.
+
+```c
+CBAT_API bool cbat_ui_radio(CBatUi *ui, const char *label, int *selected, int value);
+```
+
+True if click changed selected to value.
+
+```c
+CBAT_API bool cbat_ui_slider_double(CBatUi *ui, const char *label, double *value, double min, double max);
+```
+
+Drag or focused left/right keys; clamps to finite min<=max. True if changed.
+
+```c
+CBAT_API bool cbat_ui_slider_int(CBatUi *ui, const char *label, int *value, int min, int max);
+```
+
+Integer slider, including full int range.
+
+```c
+CBAT_API bool cbat_ui_text_input(CBatUi *ui, const char *label, CBatString *text);
+```
+
+Single-line UTF-8 editor, code-point cursor/delete, click positioning, home/end.
+Enter/Escape blur; Tab cycles submitted text fields next frame. No selection/clipboard/IME preedit.
+
+```c
+CBAT_API bool cbat_ui_collapsing_header(CBatUi *ui, const char *label);
+```
+
+Persistent disclosure toggle (initially closed); true while expanded.
+
+```c
+CBAT_API void cbat_ui_progress(CBatUi *ui, float fraction);
+```
+
+Progress indicator, fraction clamped to [0,1].
+
+```c
+CBAT_API void cbat_ui_style_default(CBatUiStyle *out);
+```
+
+Writes default style (NULL ignored).
+
+```c
+CBAT_API void cbat_ui_set_style(CBatUi *ui, const CBatUiStyle *style);
+```
+
+Copies valid style, otherwise latches INVALID_ARGUMENT.
 
 
 ## url

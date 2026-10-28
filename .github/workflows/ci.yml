@@ -46,10 +46,24 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
-      - run: cmake -S . -B build -DCMAKE_C_COMPILER=clang -DCBAT_WITH_REGEX=OFF -DCBAT_WERROR=ON
+      - run: cmake -S . -B build -DCMAKE_C_COMPILER=clang -DCBAT_WITH_REGEX=OFF -DCBAT_WITH_UI=OFF -DCBAT_WERROR=ON
       - run: cmake --build build --parallel
       - run: ctest --test-dir build --output-on-failure
-      - run: clang -std=c99 -Wall -Wextra -Werror -DCBAT_WITH_REGEX=0 -I build/dist tests/amalgamation_main.c -lm -o build/single-minimal && build/single-minimal
+      - run: clang -std=c99 -Wall -Wextra -Werror -DCBAT_WITH_REGEX=0 -DCBAT_WITH_UI=0 -I build/dist tests/amalgamation_main.c -lm -o build/single-minimal && build/single-minimal
+
+  sdl-host:
+    name: SDL UI reference host
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - run: sudo apt-get update && sudo apt-get install -y libsdl2-dev libsdl2-ttf-dev fonts-dejavu-core
+      - run: cmake -S docs/examples -B build -DCMAKE_C_COMPILER=clang -DCBAT_BUILD_SDL_EXAMPLE=ON -DCBAT_WERROR=ON
+      - run: cmake --build build --parallel
+      - run: SDL_VIDEODRIVER=dummy build/ui_sdl /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --smoke build/ui.bmp
+      - uses: actions/upload-artifact@v6
+        with:
+          name: ui-reference-screenshot
+          path: build/ui.bmp
 
   desktop:
     name: ${{ matrix.name }}

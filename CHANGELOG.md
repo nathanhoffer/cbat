@@ -23,6 +23,9 @@ Versions use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Optional renderer-independent immediate-mode UI, persistent IDs, windows,
+  rows, clipping/scrolling, widgets/sliders and UTF-8 text editing, scripted
+  frame/OOM tests, a headless recipe and an SDL2/SDL2_ttf reference host.
 - Optional byte-oriented regex module with ordered Pike VM matching, captures,
   greedy/lazy bounded repetition, ASCII classes, replacement/splitting, a log
   parsing recipe, allocation-failure tests and sanitizer fuzz coverage.

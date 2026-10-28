@@ -50,7 +50,7 @@ set(CBAT_MODULES
 )
 
 # ---- Warnings --------------------------------------------------------------
-set(CBAT_OPTIONAL_MODULES regex)
+set(CBAT_OPTIONAL_MODULES regex ui)
 set(CBAT_ENABLED_MODULES ${CBAT_MODULES})
 foreach(module IN LISTS CBAT_OPTIONAL_MODULES)
     string(TOUPPER "${module}" module_upper)
@@ -174,6 +174,9 @@ if(CBAT_BUILD_COOKBOOK)
     foreach(recipe IN LISTS CBAT_RECIPES)
         get_filename_component(recipe_name "${recipe}" NAME_WE)
         if(recipe_name STREQUAL "25-regex-log-lines" AND NOT CBAT_WITH_REGEX)
+            continue()
+        endif()
+        if(recipe_name STREQUAL "26-ui-command-list" AND NOT CBAT_WITH_UI)
             continue()
         endif()
         set(recipe_target "cookbook_${recipe_name}")

@@ -105,6 +105,11 @@ byte-oriented Pike VM regex engine; disable its compiled library source with
 `-DCBAT_WITH_REGEX=OFF`. For the single header, define `CBAT_WITH_REGEX 0`
 before including it to omit regex declarations and implementation.
 
+`cbat/ui.h` provides renderer-independent immediate-mode widgets, UTF-8 text
+editing, layout and draw commands. Use `CBAT_WITH_UI=OFF` in CMake or define
+`CBAT_WITH_UI 0` for the single header to omit it. See
+[`docs/examples/ui_sdl.c`](docs/examples/ui_sdl.c) for a complete SDL2 host.
+
 Build and install to a prefix you own (no administrator access required):
 
 ```bash

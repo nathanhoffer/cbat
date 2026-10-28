@@ -32,3 +32,24 @@ before checking results and cleaning up.
 This example runs against the native library. The app VM currently does not
 bind the test runner (`cbat_test_main`), so this recipe lives here instead of
 in the cookbook directory automatically imported into the app.
+
+## SDL UI reference host
+
+`ui_sdl.c` renders `cbat/ui.h` commands with SDL2 and SDL2_ttf. Install those
+development packages and pkg-config, then build this optional target:
+
+```sh
+cmake -S docs/examples -B build/ui-host -DCBAT_BUILD_SDL_EXAMPLE=ON
+cmake --build build/ui-host --target ui_sdl
+build/ui-host/ui_sdl /path/to/font.ttf
+```
+
+The host maps mouse, wheel, key and UTF-8 text events to frame input, measures
+text with the supplied font, intersects the clip stack and draws every command
+type. Drag the title, click its +/- marker to collapse, Tab between text fields,
+and drag the volume slider. Fonts stay outside the library.
+
+For a headless render, set `SDL_VIDEODRIVER=dummy` and append
+`--smoke screenshot.bmp`. CI builds this host against the SDL packages and
+uploads the resulting screenshot. This reference favors clarity over caching:
+it creates text textures per command; a production host should cache them.

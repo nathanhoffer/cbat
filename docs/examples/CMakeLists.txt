@@ -19,3 +19,16 @@ set_tests_properties(writing_tests_list PROPERTIES
 add_test(NAME writing_tests_filter COMMAND writing_tests allocation)
 set_tests_properties(writing_tests_filter PROPERTIES
     PASS_REGULAR_EXPRESSION "1 passed, 0 failed, 2 filtered out")
+
+option(CBAT_BUILD_SDL_EXAMPLE "Build SDL2/SDL2_ttf UI reference host" OFF)
+if(CBAT_BUILD_SDL_EXAMPLE)
+    if(NOT CBAT_WITH_UI)
+        message(FATAL_ERROR "SDL example requires CBAT_WITH_UI=ON")
+    endif()
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(SDL_HOST REQUIRED IMPORTED_TARGET sdl2 SDL2_ttf)
+    add_executable(ui_sdl ui_sdl.c)
+    cbat_set_standard(ui_sdl)
+    cbat_set_warnings(ui_sdl)
+    target_link_libraries(ui_sdl PRIVATE cbat::cbat PkgConfig::SDL_HOST)
+endif()
