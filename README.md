@@ -1,5 +1,8 @@
 # cbat: C Batteries Included
 
+[![CI](https://github.com/nathanhoffer/cbat/actions/workflows/ci.yml/badge.svg)](https://github.com/nathanhoffer/cbat/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 Python ships with batteries: strings, lists, dicts, JSON, CSV, file and path
 tools, hashing, dates, logging, argument parsing, statistics and unit tests.
 **cbat** brings the same batteries to C, in one small, portable, thoroughly
@@ -85,8 +88,37 @@ ctest --test-dir build --output-on-failure
 Options: `-DCBAT_WERROR=ON`, `-DCBAT_SANITIZE=ON` (ASan+UBSan),
 `-DBUILD_SHARED_LIBS=ON`, `-DCBAT_BUILD_TESTS=OFF`, `-DCBAT_BUILD_COOKBOOK=OFF`.
 
-**Using it from CMake:** after installing, use `find_package(cbat)` and link
-`cbat::cbat`. As a subproject, use `add_subdirectory(cbat)`.
+## Install
+
+Build and install to a prefix you own (no administrator access required):
+
+```bash
+cmake -S . -B build -DCMAKE_INSTALL_PREFIX=/path/to/cbat-install
+cmake --build build --config Release
+cmake --install build --config Release
+```
+
+In a consuming CMake project, configure with
+`-DCMAKE_PREFIX_PATH=/path/to/cbat-install`, then use:
+
+```cmake
+find_package(cbat 0.1 CONFIG REQUIRED)
+add_executable(my_program main.c)
+target_link_libraries(my_program PRIVATE cbat::cbat)
+```
+
+Alternatively, vendor this repository alongside your sources:
+
+```cmake
+add_subdirectory(external/cbat)
+add_executable(my_program main.c)
+target_link_libraries(my_program PRIVATE cbat::cbat)
+```
+
+Include `cbat/cbat.h` for all modules, or individual headers such as
+`cbat/json.h`. Use the same compiler/runtime configuration for the library
+and your application. With a shared build on Windows, put the installed DLL
+beside your executable or on `PATH`.
 
 **Single header:** `python tools/amalgamate.py` writes `dist/cbat.h`. In
 exactly one `.c` file, write:
@@ -95,6 +127,10 @@ exactly one `.c` file, write:
 #define CBAT_IMPLEMENTATION
 #include "cbat.h"
 ```
+
+Include `cbat.h` normally in every other translation unit. Put the
+implementation define before any system headers; compile as C99 and link
+`libm` on platforms that require it (for example, `cc main.c -lm`).
 
 ## Cookbook
 
@@ -128,6 +164,9 @@ Tier 2, explicitly second-class to the modules above: `ui` (an
 immediate-mode UI in the style of egui or microui), `ndarray`/`linalg`
 (numpy-like), `ml` (scikit-like basics), `regex`, `bigint` and compression.
 See [PROMPT.md](PROMPT.md) and [docs/DESIGN.md](docs/DESIGN.md).
+
+Changes are recorded in [CHANGELOG.md](CHANGELOG.md). Build and contribution
+instructions are in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
