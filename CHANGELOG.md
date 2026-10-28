@@ -23,6 +23,9 @@ Versions use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Optional multidimensional double arrays with broadcasting/reductions and
+  dense linear algebra with batched/vector matrix multiplication, transpose,
+  partial-pivoted LU solve/inverse/determinant, plus a numeric cookbook recipe.
 - Optional renderer-independent immediate-mode UI, persistent IDs, windows,
   rows, clipping/scrolling, widgets/sliders and UTF-8 text editing, scripted
   frame/OOM tests, a headless recipe and an SDL2/SDL2_ttf reference host.

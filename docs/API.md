@@ -22,10 +22,12 @@ For conventions and ownership rules, see [DESIGN.md](DESIGN.md).
 - [heap](#heap)
 - [ini](#ini)
 - [json](#json)
+- [linalg](#linalg)
 - [list](#list)
 - [log](#log)
 - [map](#map)
 - [math](#math)
+- [ndarray](#ndarray)
 - [path](#path)
 - [random](#random)
 - [regex](#regex)
@@ -1862,6 +1864,60 @@ CBAT_API bool cbat_json_pointer_bool(const CBatJson *root, const char *pointer, 
 Same for booleans.
 
 
+## linalg
+
+Source: [`cbat/linalg.h`](../include/cbat/linalg.h)
+
+```text
+cbat/linalg.h - dense double matrix algebra on CBatArray. MIT License.
+Optional CBAT_WITH_LINALG (default ON) requires CBAT_WITH_NDARRAY.
+Results use default allocator and own their data; inputs remain unchanged.
+Fallible APIs preserve out on error. Dimension mismatches: INVALID_ARGUMENT.
+```
+
+```c
+CBAT_API CBatError cbat_linalg_matmul(const CBatArray *a, const CBatArray *b, CBatArray **out);
+```
+
+NumPy-style matmul: rank 1 vectors, rank >=2 matrices, trailing two axes
+multiplied and preceding axes broadcast. Vector-vector gives scalar.
+Empty inner axes sum to zero; IEEE arithmetic propagates NaN/infinity.
+
+```c
+CBAT_API CBatError cbat_linalg_transpose(const CBatArray *a, CBatArray **out);
+```
+
+New copy with axis order reversed (matrix transpose; vector/scalar copy).
+
+```c
+CBAT_API CBatError cbat_linalg_solve(const CBatArray *a, const CBatArray *b, CBatArray **out);
+```
+
+Solves square 2D A * X = B with partial-pivoted LU; B is vector or 2D RHS.
+Finite inputs required. Exactly zero pivot: OUT_OF_RANGE (singular).
+Nonfinite intermediate/result: OVERFLOW. Ill-conditioned results may lose
+accuracy; no rank threshold is imposed. Empty square systems are accepted.
+
+```c
+CBAT_API CBatError cbat_linalg_inverse(const CBatArray *a, CBatArray **out);
+```
+
+Square matrix inverse via pivoted solve; same errors as solve.
+
+```c
+CBAT_API CBatError cbat_linalg_determinant(const CBatArray *a, double *out);
+```
+
+Square determinant via pivoted LU; singular gives 0, empty gives 1.
+Finite inputs required; overflow gives OVERFLOW, underflow gives signed zero.
+
+```c
+CBAT_API CBatError cbat_linalg_identity(size_t n, CBatArray **out);
+```
+
+New n*n identity matrix, including n=0.
+
+
 ## list
 
 Source: [`cbat/list.h`](../include/cbat/list.h)
@@ -2335,6 +2391,168 @@ Checked 64-bit arithmetic: false on overflow (out untouched).
 ```c
 CBAT_API bool cbat_math_mul_int64(int64_t a, int64_t b, int64_t *out);
 ```
+
+
+## ndarray
+
+Source: [`cbat/ndarray.h`](../include/cbat/ndarray.h)
+
+```text
+cbat/ndarray.h - owned contiguous row-major double arrays, 0..4 axes.
+Zero axes represent a scalar (one value); zero-length axes are allowed.
+Optional tier 2: include explicitly; CBAT_WITH_NDARRAY defaults ON.
+Shape/data pointers are borrowed; array operations copy values, never views.
+Objects require external synchronization for concurrent mutation.
+MIT License.
+```
+
+```c
+typedef struct CBatArray CBatArray;
+```
+
+```c
+CBAT_API CBatError cbat_array_new(size_t dimensions, const size_t *shape, CBatArray **out);
+```
+
+New zero-filled array; shape has dimensions entries (NULL for scalar).
+INVALID_ARGUMENT for >4 axes; OVERFLOW for element/byte count overflow.
+All fallible APIs leave output unchanged on failure.
+
+```c
+CBAT_API CBatError cbat_array_new_with(size_t dimensions, const size_t *shape, const CBatAllocator *allocator, CBatArray **out);
+```
+
+Same with retained allocator (NULL = default), which must outlive array.
+
+```c
+CBAT_API CBatError cbat_array_from_values(size_t dimensions, const size_t *shape, const double *values, CBatArray **out);
+```
+
+Copies row-major values; NULL values allowed only for zero elements.
+
+```c
+CBAT_API CBatError cbat_array_from_values_with(size_t dimensions, const size_t *shape, const double *values, const CBatAllocator *allocator, CBatArray **out);
+```
+
+Same with retained allocator.
+
+```c
+CBAT_API CBatError cbat_array_arange(double start, double stop, double step, CBatArray **out);
+```
+
+[start,stop) with nonzero finite step; wrong direction returns empty vector.
+Floating rounding can repeat values. Nonfinite arguments are INVALID_ARGUMENT.
+
+```c
+CBAT_API CBatError cbat_array_linspace(double start, double stop, size_t count, CBatArray **out);
+```
+
+count evenly spaced values including endpoints; count 1 yields start, 0 empty. Finite endpoints required.
+
+```c
+CBAT_API void cbat_array_free(CBatArray *array);
+```
+
+Frees array and data; NULL ignored.
+
+```c
+CBAT_API size_t cbat_array_dimensions(const CBatArray *array);
+```
+
+Rank, 0 for scalar or NULL.
+
+```c
+CBAT_API size_t cbat_array_shape(const CBatArray *array, size_t axis);
+```
+
+Extent of axis, 0 for invalid array/axis.
+
+```c
+CBAT_API size_t cbat_array_size(const CBatArray *array);
+```
+
+Element count (scalar = 1), 0 for NULL.
+
+```c
+CBAT_API double *cbat_array_data(CBatArray *array);
+```
+
+Borrowed mutable contiguous data; NULL for empty/NULL array.
+
+```c
+CBAT_API const double *cbat_array_const_data(const CBatArray *array);
+```
+
+Borrowed read-only data; same lifetime as data.
+
+```c
+CBAT_API CBatError cbat_array_get(const CBatArray *array, const size_t *index, double *out);
+```
+
+Reads indexed value. index has rank entries (NULL allowed for scalar).
+
+```c
+CBAT_API CBatError cbat_array_set(CBatArray *array, const size_t *index, double value);
+```
+
+Writes indexed value, allowing all double values including NaN/infinity.
+
+```c
+CBAT_API CBatError cbat_array_reshape(CBatArray *array, size_t dimensions, const size_t *shape);
+```
+
+Changes shape without moving data; same element count required. Atomic on error.
+
+```c
+CBAT_API CBatError cbat_array_add(const CBatArray *a, const CBatArray *b, CBatArray **out);
+```
+
+Elementwise addition with NumPy trailing-axis broadcasting. New result uses a's allocator.
+Incompatible shapes give INVALID_ARGUMENT. IEEE NaN/infinity propagation.
+
+```c
+CBAT_API CBatError cbat_array_subtract(const CBatArray *a, const CBatArray *b, CBatArray **out);
+```
+
+Broadcast subtraction, same rules as add.
+
+```c
+CBAT_API CBatError cbat_array_multiply(const CBatArray *a, const CBatArray *b, CBatArray **out);
+```
+
+Broadcast multiplication, same rules as add.
+
+```c
+CBAT_API CBatError cbat_array_divide(const CBatArray *a, const CBatArray *b, CBatArray **out);
+```
+
+Broadcast division; IEEE division by zero yields infinity/NaN.
+
+```c
+CBAT_API void cbat_array_scale(CBatArray *array, double factor);
+```
+
+Multiplies all values in place; NULL ignored.
+
+```c
+CBAT_API CBatError cbat_array_sum_axis(const CBatArray *array, size_t axis, CBatArray **out);
+```
+
+Reduces axis, removing it (vector -> scalar). Empty-axis sum is zero.
+Result uses input allocator; OUT_OF_RANGE for invalid axis.
+
+```c
+CBAT_API CBatError cbat_array_mean_axis(const CBatArray *array, size_t axis, CBatArray **out);
+```
+
+Same, dividing by axis extent. Empty-axis mean is NaN.
+
+```c
+CBAT_API CBatError cbat_array_to_string(const CBatArray *array, CBatString **out);
+```
+
+New owned nested-bracket text, spaces between numbers and newlines between
+subarrays; scalar has no brackets. No truncation. Uses array allocator.
 
 
 ## path

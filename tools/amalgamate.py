@@ -60,7 +60,10 @@ def main():
         block = f"/* ==== src/{module}.c ==== */\n" + strip_local_includes(text)
         if module in optional:
             flag = "CBAT_WITH_" + module.upper()
-            block = f"#if !defined({flag}) || {flag}\n" + block + "#endif\n"
+            condition = f"(!defined({flag}) || {flag})"
+            if module == "linalg":
+                condition += " && (!defined(CBAT_WITH_NDARRAY) || CBAT_WITH_NDARRAY)"
+            block = f"#if {condition}\n" + block + "#endif\n"
         sources.append(block)
 
     headers = []
@@ -69,7 +72,10 @@ def main():
         block = f"/* ==== include/cbat/{module}.h ==== */\n" + strip_local_includes(text)
         if module in optional:
             flag = "CBAT_WITH_" + module.upper()
-            block = f"#if !defined({flag}) || {flag}\n" + block + "#endif\n"
+            condition = f"(!defined({flag}) || {flag})"
+            if module == "linalg":
+                condition += " && (!defined(CBAT_WITH_NDARRAY) || CBAT_WITH_NDARRAY)"
+            block = f"#if {condition}\n" + block + "#endif\n"
         headers.append(block)
 
     license_text = (ROOT / "LICENSE").read_text(encoding="utf-8").strip()

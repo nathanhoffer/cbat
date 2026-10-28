@@ -110,6 +110,12 @@ editing, layout and draw commands. Use `CBAT_WITH_UI=OFF` in CMake or define
 `CBAT_WITH_UI 0` for the single header to omit it. See
 [`docs/examples/ui_sdl.c`](docs/examples/ui_sdl.c) for a complete SDL2 host.
 
+`cbat/ndarray.h` provides contiguous double arrays with up to four axes,
+broadcasting and reductions. `cbat/linalg.h` adds batched/vector matrix
+multiplication, transpose, pivoted solves, inverses and determinants. Their
+options are `CBAT_WITH_NDARRAY` and `CBAT_WITH_LINALG`; linalg requires ndarray.
+For the single header, setting `CBAT_WITH_NDARRAY 0` also omits linalg.
+
 Build and install to a prefix you own (no administrator access required):
 
 ```bash

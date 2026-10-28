@@ -48,5 +48,16 @@ int main(void) {
         cbat_regex_free(regex);
     }
 #endif
+#if (!defined(CBAT_WITH_NDARRAY) || CBAT_WITH_NDARRAY) && (!defined(CBAT_WITH_LINALG) || CBAT_WITH_LINALG)
+    {
+        CBatArray *identity = NULL;
+        double determinant = 0;
+        if (cbat_linalg_identity(2, &identity) != CBAT_OK) return 1;
+        if (cbat_linalg_determinant(identity, &determinant) != CBAT_OK || determinant != 1) {
+            cbat_array_free(identity); return 1;
+        }
+        cbat_array_free(identity);
+    }
+#endif
     return 0;
 }

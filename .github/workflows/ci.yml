@@ -46,10 +46,10 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
-      - run: cmake -S . -B build -DCMAKE_C_COMPILER=clang -DCBAT_WITH_REGEX=OFF -DCBAT_WITH_UI=OFF -DCBAT_WERROR=ON
+      - run: cmake -S . -B build -DCMAKE_C_COMPILER=clang -DCBAT_WITH_REGEX=OFF -DCBAT_WITH_UI=OFF -DCBAT_WITH_NDARRAY=OFF -DCBAT_WITH_LINALG=OFF -DCBAT_WERROR=ON
       - run: cmake --build build --parallel
       - run: ctest --test-dir build --output-on-failure
-      - run: clang -std=c99 -Wall -Wextra -Werror -DCBAT_WITH_REGEX=0 -DCBAT_WITH_UI=0 -I build/dist tests/amalgamation_main.c -lm -o build/single-minimal && build/single-minimal
+      - run: clang -std=c99 -Wall -Wextra -Werror -DCBAT_WITH_REGEX=0 -DCBAT_WITH_UI=0 -DCBAT_WITH_NDARRAY=0 -I build/dist tests/amalgamation_main.c -lm -o build/single-minimal && build/single-minimal
 
   sdl-host:
     name: SDL UI reference host
