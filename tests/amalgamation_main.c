@@ -9,6 +9,7 @@
 
 int main(void) {
     CBatArena *arena = cbat_arena_new(0);
+    CBatMap *map;
     char *copy;
     if (arena == NULL) {
         return 1;
@@ -20,5 +21,13 @@ int main(void) {
     }
     printf("%s (cbat %s)\n", copy, CBAT_VERSION_STRING);
     cbat_arena_free(arena);
+    map = cbat_map_new(sizeof(int), sizeof(int));
+    if (map == NULL) return 1;
+    if (CBAT_MAP_SET(map, int, 42, int, 7) != CBAT_OK ||
+        CBAT_MAP_GET(map, int, 42, int, 0) != 7) {
+        cbat_map_free(map);
+        return 1;
+    }
+    cbat_map_free(map);
     return 0;
 }

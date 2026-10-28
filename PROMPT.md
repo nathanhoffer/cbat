@@ -50,7 +50,7 @@ global surprises, no aborts on bad input, and every failure reported as a value.
 | Area | Headers |
 |---|---|
 | Core | `base.h` (errors, allocators, arena, checked math), `test.h` |
-| Containers | `string.h` (+UTF-8), `list.h`, `dict.h`, `set.h`, `deque.h`, `sort.h` |
+| Containers | `string.h` (+UTF-8), `list.h`, `dict.h`, `map.h`, `set.h`, `deque.h`, `sort.h` |
 | Files & OS | `path.h`, `file.h`, `fs.h` |
 | Data formats | `json.h`, `csv.h`, `encoding.h` (base64, hex) |
 | Utilities | `random.h`, `stats.h` (math/statistics), `time.h`, `log.h`, `args.h`, `hash.h` |

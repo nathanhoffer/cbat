@@ -14,6 +14,7 @@
 #include "cbat/hash.h"
 #include "cbat/string.h"
 #include "cbat/dict.h"
+#include "cbat/map.h"
 #include "cbat/set.h"
 #include "cbat/deque.h"
 #include "cbat/path.h"

@@ -28,6 +28,7 @@ set(CBAT_MODULES
     hash
     string
     dict
+    map
     set
     deque
     path

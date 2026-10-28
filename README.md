@@ -43,6 +43,7 @@ and header documentation.
 | `cbat/string.h` | `str` | growable strings, find/replace/split/join/trim, number parsing, UTF-8 |
 | `cbat/list.h` | `list` | type-erased dynamic array, typed macros, element destructors |
 | `cbat/dict.h` | `dict` | insertion-ordered string-keyed hash map |
+| `cbat/map.h` | `dict` | fixed-size keys (integers, structs), custom hash/equality, insertion order |
 | `cbat/set.h` | `set` | union, intersection, difference, subset |
 | `cbat/deque.h` | `collections.deque` | ring buffer with O(1) ends |
 | `cbat/sort.h` | `sorted`, `bisect` | stable sort, binary search, comparators |

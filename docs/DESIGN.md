@@ -61,6 +61,12 @@ if (err != CBAT_OK) {
   `CBAT_LIST_PUSH(list, int, 42)`, `CBAT_LIST_GET(list, int, 0)`.
 - `CBatDict` and `CBatSet` use UTF-8 string keys (copied and owned) and
   preserve insertion order, like Python's `dict`.
+- `CBatMap` copies fixed-size keys and values, preserving insertion order.
+  Default key equality includes all representation bytes (zero struct padding
+  before use). Custom hash/equality callbacks must agree and remain stable.
+  Stored keys/values support fundamental C99 alignment, not over-aligned
+  extensions. Mutating operations invalidate iterators and borrowed pointers,
+  including failed inserts that compact internal storage.
 
 ## Portability notes
 

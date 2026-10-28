@@ -21,6 +21,7 @@ For conventions and ownership rules, see [DESIGN.md](DESIGN.md).
 - [json](#json)
 - [list](#list)
 - [log](#log)
+- [map](#map)
 - [math](#math)
 - [path](#path)
 - [random](#random)
@@ -1591,6 +1592,139 @@ CBAT_API void cbat_log_message(CBatLogLevel level, const char *file, int line, c
 ```
 
 Logs a printf-style message. Prefer the CBAT_LOG_* macros.
+
+
+## map
+
+Source: [`cbat/map.h`](../include/cbat/map.h)
+
+```text
+cbat/map.h - insertion-ordered maps with fixed-size keys and values.
+
+    CBatMap *counts = cbat_map_new(sizeof(int), sizeof(int));
+    CBAT_MAP_SET(counts, int, 42, int, 3);
+    int count = CBAT_MAP_GET(counts, int, 42, int, 0);
+    cbat_map_free(counts);
+
+Keys and values are copied as bytes. By default all key_size bytes are
+hashed/compared, including padding: zero-initialize struct keys. Floating
+keys use representation equality (-0.0 differs from +0.0; NaN payloads
+may differ). Custom hash/equality callbacks must agree and remain stable.
+Pointers returned by get/next are borrowed until the next modification.
+Mutation, including removal, invalidates an active iterator. Objects have
+no support for over-aligned compiler-extension types. A set operation may
+compact storage even if a later allocation fails: refresh borrowed pointers
+and restart iteration after any set/remove/clear call. Callbacks must not
+mutate the map or change key representations.
+There is no internal locking. Part of cbat. MIT License.
+```
+
+```c
+typedef struct CBatMap CBatMap;
+```
+
+```c
+typedef uint64_t (*CBatHashFunction)(const void *key);
+```
+
+Receives a pointer to the stored key representation.
+
+```c
+typedef bool (*CBatEqualFunction)(const void *a, const void *b);
+```
+
+Must return true only for keys with the same hash.
+
+```c
+CBAT_API CBatMap *cbat_map_new(size_t key_size, size_t value_size);
+```
+
+New empty map; key_size must be nonzero (otherwise NULL). Values may be 0 bytes.
+
+```c
+CBAT_API CBatMap *cbat_map_new_with(size_t key_size, size_t value_size, const CBatAllocator *allocator);
+```
+
+Same with an allocator (NULL selects the default). Allocator must outlive the map.
+
+```c
+CBAT_API void cbat_map_free(CBatMap *map);
+```
+
+Destroys owned entries and storage. NULL is ignored.
+
+```c
+CBAT_API CBatError cbat_map_set_hash(CBatMap *map, CBatHashFunction hash, CBatEqualFunction equal);
+```
+
+Only on an empty map. Both callbacks NULL restores bytewise keys; one NULL is invalid.
+
+```c
+CBAT_API void cbat_map_set_key_destructor(CBatMap *map, CBatDestructor destructor);
+```
+
+Called on keys removed without transfer, cleared, or freed; not on replacement.
+
+```c
+CBAT_API void cbat_map_set_value_destructor(CBatMap *map, CBatDestructor destructor);
+```
+
+Called on values replaced, removed without transfer, cleared, or freed.
+
+```c
+CBAT_API size_t cbat_map_length(const CBatMap *map);
+```
+
+Live entry count; 0 for NULL.
+
+```c
+CBAT_API CBatError cbat_map_set(CBatMap *map, const void *key, const void *value);
+```
+
+Inserts/replaces copied data. An existing key keeps its original key and
+position. Ownership of pointed-to resources transfers only on success;
+a replacement transfers only the new value, not the candidate key.
+value may be NULL only for zero-sized values. Returns INVALID_ARGUMENT,
+NO_MEMORY or OVERFLOW on failure, with entries unchanged. Input may point
+into this map. Do not mutate keys in place or change hash/equality state.
+
+```c
+CBAT_API void *cbat_map_get(const CBatMap *map, const void *key);
+```
+
+Borrowed value pointer, or NULL for a missing/invalid key.
+
+```c
+CBAT_API void *cbat_map_get_or(const CBatMap *map, const void *key, void *fallback);
+```
+
+Stored value or fallback.
+
+```c
+CBAT_API bool cbat_map_contains(const CBatMap *map, const void *key);
+```
+
+Whether a key is present (false for NULL arguments).
+
+```c
+CBAT_API CBatError cbat_map_remove(CBatMap *map, const void *key, void *key_out, void *value_out);
+```
+
+Removes a key, or returns NOT_FOUND/INVALID_ARGUMENT. Non-NULL outputs
+receive copies and ownership (no destructor); otherwise that part is
+destroyed. Outputs must be external storage, unchanged on failure.
+
+```c
+CBAT_API void cbat_map_clear(CBatMap *map);
+```
+
+Destroys all entries, retaining storage and callback settings. NULL is ignored.
+
+```c
+CBAT_API bool cbat_map_next(const CBatMap *map, size_t *iterator, const void **key, void **value);
+```
+
+Insertion order. Start *iterator at 0; outputs may be NULL; false at end/invalid input.
 
 
 ## math

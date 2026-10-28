@@ -20,6 +20,8 @@ Versions use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `CBatMap` with fixed-size keys/values, integer-key convenience macros,
+  insertion-order iteration, custom hashing/equality, and ownership callbacks.
 - Opt-in libFuzzer targets for JSON, CSV, ISO dates, Base64 and UTF-8, with
   seed corpora and a Linux CI sanitizer run for each parser.
 - A native example for writing tests, allocation failure injection, filtering,
